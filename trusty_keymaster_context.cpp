@@ -109,6 +109,7 @@ static keymaster_error_t SetAuthorizations(const AuthorizationSet& key_descripti
         case KM_TAG_AUTH_TOKEN:
         case KM_TAG_MAC_LENGTH:
         case KM_TAG_ASSOCIATED_DATA:
+        case KM_TAG_UNIQUE_ID:
             return KM_ERROR_INVALID_KEY_BLOB;
 
         case KM_TAG_ROLLBACK_RESISTANT:
@@ -117,6 +118,7 @@ static keymaster_error_t SetAuthorizations(const AuthorizationSet& key_descripti
         case KM_TAG_ALL_APPLICATIONS:
         case KM_TAG_ROOT_OF_TRUST:
         case KM_TAG_ORIGIN:
+        case KM_TAG_RESET_SINCE_ID_ROTATION:
             // Ignore these.
             break;
 
@@ -135,6 +137,9 @@ static keymaster_error_t SetAuthorizations(const AuthorizationSet& key_descripti
         case KM_TAG_AUTH_TIMEOUT:
         case KM_TAG_CALLER_NONCE:
         case KM_TAG_MIN_MAC_LENGTH:
+        case KM_TAG_KDF:
+        case KM_TAG_EC_CURVE:
+        case KM_TAG_ECIES_SINGLE_HASH_MODE:
             hw_enforced->push_back(entry);
             break;
 
@@ -151,6 +156,10 @@ static keymaster_error_t SetAuthorizations(const AuthorizationSet& key_descripti
         case KM_TAG_USER_ID:
         case KM_TAG_ALL_USERS:
         case KM_TAG_CREATION_DATETIME:
+        case KM_TAG_INCLUDE_UNIQUE_ID:
+        case KM_TAG_EXPORTABLE:
+        case KM_TAG_OS_VERSION:
+        case KM_TAG_OS_PATCHLEVEL:
 
             sw_enforced->push_back(entry);
             break;
