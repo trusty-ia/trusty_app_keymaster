@@ -27,6 +27,7 @@ MODULE_SRCS += \
 	$(KEYMASTER_ROOT)/android_keymaster_utils.cpp \
 	$(KEYMASTER_ROOT)/asymmetric_key.cpp \
 	$(KEYMASTER_ROOT)/asymmetric_key_factory.cpp \
+	$(KEYMASTER_ROOT)/attestation_record.cpp \
 	$(KEYMASTER_ROOT)/auth_encrypted_key_blob.cpp \
 	$(KEYMASTER_ROOT)/authorization_set.cpp \
 	$(KEYMASTER_ROOT)/ec_key.cpp \
