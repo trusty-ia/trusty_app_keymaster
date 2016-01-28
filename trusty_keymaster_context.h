@@ -59,6 +59,18 @@ class TrustyKeymasterContext : public KeymasterContext {
 
     KeymasterEnforcement* enforcement_policy() /* override */ { return &enforcement_policy_; }
 
+    EVP_PKEY* AttestationKey(keymaster_algorithm_t algorithm,
+                             keymaster_error_t* error) const override{
+        *error = KM_ERROR_UNIMPLEMENTED;
+        return nullptr;
+    };
+
+    keymaster_cert_chain_t* AttestationChain(keymaster_algorithm_t algorithm,
+                                             keymaster_error_t* error) const override{
+        *error = KM_ERROR_UNIMPLEMENTED;
+        return nullptr;
+    };
+
   private:
     bool SeedRngIfNeeded() const;
     bool ShouldReseedRng() const;
