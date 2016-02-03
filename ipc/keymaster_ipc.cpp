@@ -72,6 +72,7 @@ static tipc_event_handler keymaster_port_evt_handler_non_secure = {
 static void keymaster_chan_handler(const uevent_t* ev, void* priv);
 
 TrustyKeymaster* device;
+int32_t message_version = -1;
 
 class MessageDeleter {
   public:
@@ -125,10 +126,12 @@ static long do_dispatch(void (AndroidKeymaster::*operation)(const Request&, Resp
                         UniquePtr<uint8_t[]>* out, uint32_t* out_size) {
     const uint8_t* payload = msg->payload;
     Request req;
+    req.message_version = message_version;
     if (!req.Deserialize(&payload, msg->payload + payload_size))
         return ERR_NOT_VALID;
 
     Response rsp;
+    rsp.message_version = message_version;
     (device->*operation)(req, &rsp);
 
     *out_size = rsp.SerializedSize();
@@ -486,6 +489,17 @@ int main(void) {
     TrustyLogger::initialize();
 
     LOG_I("Initializing", 0);
+
+    GetVersionRequest request;
+    GetVersionResponse response;
+    device->GetVersion(request, &response);
+    if (response.error == KM_ERROR_OK) {
+      message_version = MessageVersion(
+          response.major_ver, response.minor_ver, response.subminor_ver);
+    } else {
+      LOG_E("Error %d determining AndroidKeymaster version.", response.error);
+      return ERR_GENERIC;
+    }
 
     keymaster_srv_ctx ctx;
     rc = keymaster_ipc_init(&ctx);
