@@ -20,16 +20,20 @@ MODULE := $(LOCAL_DIR)
 KEYMASTER_ROOT := $(LOCAL_DIR)/../../system/keymaster
 
 MODULE_SRCS += \
+	$(KEYMASTER_ROOT)/aes_key.cpp \
+	$(KEYMASTER_ROOT)/aes_operation.cpp \
 	$(KEYMASTER_ROOT)/android_keymaster.cpp \
 	$(KEYMASTER_ROOT)/android_keymaster_messages.cpp \
 	$(KEYMASTER_ROOT)/android_keymaster_utils.cpp \
-	$(KEYMASTER_ROOT)/auth_encrypted_key_blob.cpp \
 	$(KEYMASTER_ROOT)/asymmetric_key.cpp \
 	$(KEYMASTER_ROOT)/asymmetric_key_factory.cpp \
+	$(KEYMASTER_ROOT)/auth_encrypted_key_blob.cpp \
 	$(KEYMASTER_ROOT)/authorization_set.cpp \
 	$(KEYMASTER_ROOT)/ec_key.cpp \
 	$(KEYMASTER_ROOT)/ec_key_factory.cpp \
 	$(KEYMASTER_ROOT)/ecdsa_operation.cpp \
+	$(KEYMASTER_ROOT)/hmac_key.cpp \
+	$(KEYMASTER_ROOT)/hmac_operation.cpp \
 	$(KEYMASTER_ROOT)/key.cpp \
 	$(KEYMASTER_ROOT)/keymaster_enforcement.cpp \
 	$(KEYMASTER_ROOT)/logger.cpp \
@@ -43,6 +47,7 @@ MODULE_SRCS += \
 	$(KEYMASTER_ROOT)/rsa_key_factory.cpp \
 	$(KEYMASTER_ROOT)/rsa_operation.cpp \
 	$(KEYMASTER_ROOT)/serializable.cpp \
+	$(KEYMASTER_ROOT)/symmetric_key.cpp \
 	$(LOCAL_DIR)/trusty_keymaster_context.cpp \
 	$(LOCAL_DIR)/trusty_keymaster_enforcement.cpp \
 	$(LOCAL_DIR)/manifest.c

@@ -26,7 +26,9 @@ extern "C" {
 #include <keymaster/logger.h>
 #include <keymaster/rsa_key_factory.h>
 
+#include "aes_key.h"
 #include "auth_encrypted_key_blob.h"
+#include "hmac_key.h"
 #include "ocb_utils.h"
 
 namespace keymaster {
@@ -43,6 +45,8 @@ TrustyKeymasterContext::TrustyKeymasterContext()
     LOG_D("Creating TrustyKeymaster", 0);
     rsa_factory_.reset(new RsaKeyFactory(this));
     ec_factory_.reset(new EcKeyFactory(this));
+    aes_factory_.reset(new AesKeyFactory(this));
+    hmac_factory_.reset(new HmacKeyFactory(this));
 }
 
 KeyFactory* TrustyKeymasterContext::GetKeyFactory(keymaster_algorithm_t algorithm) const {
@@ -51,12 +55,17 @@ KeyFactory* TrustyKeymasterContext::GetKeyFactory(keymaster_algorithm_t algorith
         return rsa_factory_.get();
     case KM_ALGORITHM_EC:
         return ec_factory_.get();
+    case KM_ALGORITHM_AES:
+        return aes_factory_.get();
+    case KM_ALGORITHM_HMAC:
+        return hmac_factory_.get();
     default:
         return nullptr;
     }
 }
 
-static keymaster_algorithm_t supported_algorithms[] = {KM_ALGORITHM_RSA, KM_ALGORITHM_EC};
+static keymaster_algorithm_t supported_algorithms[] = {KM_ALGORITHM_RSA, KM_ALGORITHM_EC,
+                                                       KM_ALGORITHM_AES, KM_ALGORITHM_HMAC};
 
 keymaster_algorithm_t*
 TrustyKeymasterContext::GetSupportedAlgorithms(size_t* algorithms_count) const {
@@ -125,6 +134,7 @@ static keymaster_error_t SetAuthorizations(const AuthorizationSet& key_descripti
         case KM_TAG_NO_AUTH_REQUIRED:
         case KM_TAG_AUTH_TIMEOUT:
         case KM_TAG_CALLER_NONCE:
+        case KM_TAG_MIN_MAC_LENGTH:
             hw_enforced->push_back(entry);
             break;
 
@@ -258,7 +268,7 @@ bool TrustyKeymasterContext::ShouldReseedRng() const {
     }
 
     if (++calls_since_reseed_ % kCallsBetweenRngReseeds == 0) {
-        LOG_E("Periodic reseed", 0);
+        LOG_I("Periodic reseed", 0);
         return true;
     }
     return false;
@@ -298,7 +308,7 @@ keymaster_error_t TrustyKeymasterContext::DeriveMasterKey(KeymasterKeyBlob* mast
         return KM_ERROR_UNKNOWN_ERROR;
     }
 
-    hwkey_session_t session = (hwkey_session_t) rc;
+    hwkey_session_t session = (hwkey_session_t)rc;
 
     if (!master_key->Reset(kAesKeySize)) {
         LOG_S("Could not allocate memory for master key buffer", 0);
@@ -307,7 +317,7 @@ keymaster_error_t TrustyKeymasterContext::DeriveMasterKey(KeymasterKeyBlob* mast
 
     uint32_t kdf_version = HWKEY_KDF_VERSION_1;
     rc = hwkey_derive(session, &kdf_version, kMasterKeyDerivationData, master_key->writable_data(),
-            kAesKeySize);
+                      kAesKeySize);
 
     if (rc < 0) {
         LOG_S("Error deriving master key: %d", rc);

@@ -68,8 +68,10 @@ class TrustyKeymasterContext : public KeymasterContext {
 
     TrustyKeymasterEnforcement enforcement_policy_;
 
-    UniquePtr<KeyFactory> rsa_factory_;
+    UniquePtr<KeyFactory> aes_factory_;
     UniquePtr<KeyFactory> ec_factory_;
+    UniquePtr<KeyFactory> hmac_factory_;
+    UniquePtr<KeyFactory> rsa_factory_;
 
     UniquePtr<uint8_t[]> master_key_;
     size_t root_of_trust_size_;

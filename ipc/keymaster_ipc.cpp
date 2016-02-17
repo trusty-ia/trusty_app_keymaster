@@ -49,7 +49,8 @@ struct keymaster_chan_ctx {
     struct tipc_event_handler handler;
     uuid_t uuid;
     handle_t chan;
-    long (*dispatch)(keymaster_chan_ctx*, keymaster_message*, uint32_t, UniquePtr<uint8_t[]>*, uint32_t*);
+    long (*dispatch)(keymaster_chan_ctx*, keymaster_message*, uint32_t, UniquePtr<uint8_t[]>*,
+                     uint32_t*);
 };
 
 struct keymaster_srv_ctx {
@@ -73,17 +74,15 @@ static void keymaster_chan_handler(const uevent_t* ev, void* priv);
 TrustyKeymaster* device;
 
 class MessageDeleter {
-public:
+  public:
     explicit MessageDeleter(handle_t chan, int id) {
         chan_ = chan;
         id_ = id;
     }
 
-    ~MessageDeleter() {
-        put_msg(chan_, id_);
-    }
+    ~MessageDeleter() { put_msg(chan_, id_); }
 
-private:
+  private:
     handle_t chan_;
     int id_;
 };
@@ -92,7 +91,7 @@ static long handle_port_errors(const uevent_t* ev) {
     if ((ev->event & IPC_HANDLE_POLL_ERROR) || (ev->event & IPC_HANDLE_POLL_HUP) ||
         (ev->event & IPC_HANDLE_POLL_MSG) || (ev->event & IPC_HANDLE_POLL_SEND_UNBLOCKED)) {
         /* should never happen with port handles */
-        LOG_E("error event (0x%x) for port (%d)\n", ev->event, ev->handle);
+        LOG_E("error event (0x%x) for port (%d)", ev->event, ev->handle);
         return ERR_BAD_STATE;
     }
 
@@ -100,18 +99,16 @@ static long handle_port_errors(const uevent_t* ev) {
 }
 
 static long send_response(handle_t chan, uint32_t cmd, uint8_t* out_buf, uint32_t out_buf_size) {
-    struct keymaster_message km_msg  = { cmd | KM_RESP_BIT };
-    iovec_t iov[2] = {
-        { &km_msg, sizeof(km_msg) },
-        { out_buf, out_buf_size }
-    };
-    ipc_msg_t msg = { 2, iov, 0, NULL };
+    struct keymaster_message km_msg;
+    km_msg.cmd = cmd | KM_RESP_BIT;
+    iovec_t iov[2] = {{&km_msg, sizeof(km_msg)}, {out_buf, out_buf_size}};
+    ipc_msg_t msg = {2, iov, 0, NULL};
 
     long rc = send_msg(chan, &msg);
 
     // fatal error
     if (rc < 0) {
-        LOG_E("failed (%d) to send_msg for chan (%d)\n", rc, chan);
+        LOG_E("failed (%d) to send_msg for chan (%d)", rc, chan);
         return rc;
     }
 
@@ -124,8 +121,8 @@ static long send_error_response(handle_t chan, uint32_t cmd, keymaster_error_t e
 
 template <typename Request, typename Response>
 static long do_dispatch(void (AndroidKeymaster::*operation)(const Request&, Response*),
-                        struct keymaster_message* msg, uint32_t payload_size, UniquePtr<uint8_t[]>* out,
-                        uint32_t* out_size) {
+                        struct keymaster_message* msg, uint32_t payload_size,
+                        UniquePtr<uint8_t[]>* out, uint32_t* out_size) {
     const uint8_t* payload = msg->payload;
     Request req;
     if (!req.Deserialize(&payload, msg->payload + payload_size))
@@ -175,7 +172,8 @@ static long get_auth_token_key(UniquePtr<uint8_t[]>* key_buf, uint32_t* key_size
 }
 
 static long keymaster_dispatch_secure(keymaster_chan_ctx* ctx, keymaster_message* msg,
-                                   uint32_t payload_size, UniquePtr<uint8_t[]>* out, uint32_t* out_size) {
+                                      uint32_t payload_size, UniquePtr<uint8_t[]>* out,
+                                      uint32_t* out_size) {
     switch (msg->cmd) {
     case KM_GET_AUTH_TOKEN_KEY:
         return get_auth_token_key(out, out_size);
@@ -185,22 +183,77 @@ static long keymaster_dispatch_secure(keymaster_chan_ctx* ctx, keymaster_message
 }
 
 static long keymaster_dispatch_non_secure(keymaster_chan_ctx* ctx, keymaster_message* msg,
-                                    uint32_t payload_size, UniquePtr<uint8_t[]>* out, uint32_t* out_size) {
+                                          uint32_t payload_size, UniquePtr<uint8_t[]>* out,
+                                          uint32_t* out_size) {
+    LOG_D("Dispatching command %d", msg->cmd);
     switch (msg->cmd) {
     case KM_GENERATE_KEY:
-        return do_dispatch(&AndroidKeymaster::GenerateKey, msg, payload_size, out, out_size);
+        LOG_D("Dispatching GENERATE_KEY, size: %d", payload_size);
+        return do_dispatch(&TrustyKeymaster::GenerateKey, msg, payload_size, out, out_size);
+
     case KM_BEGIN_OPERATION:
-        return do_dispatch(&AndroidKeymaster::BeginOperation, msg, payload_size, out, out_size);
+        LOG_D("Dispatching BEGIN_OPERATION, size: %d", payload_size);
+        return do_dispatch(&TrustyKeymaster::BeginOperation, msg, payload_size, out, out_size);
+
     case KM_UPDATE_OPERATION:
-        return do_dispatch(&AndroidKeymaster::UpdateOperation, msg, payload_size, out, out_size);
+        LOG_D("Dispatching UPDATE_OPERATION, size: %d", payload_size);
+        return do_dispatch(&TrustyKeymaster::UpdateOperation, msg, payload_size, out, out_size);
+
     case KM_FINISH_OPERATION:
-        return do_dispatch(&AndroidKeymaster::FinishOperation, msg, payload_size, out, out_size);
+        LOG_D("Dispatching FINISH_OPERATION, size: %d", payload_size);
+        return do_dispatch(&TrustyKeymaster::FinishOperation, msg, payload_size, out, out_size);
+
     case KM_IMPORT_KEY:
-        return do_dispatch(&AndroidKeymaster::ImportKey, msg, payload_size, out, out_size);
+        LOG_D("Dispatching IMPORT_KEY, size: %d", payload_size);
+        return do_dispatch(&TrustyKeymaster::ImportKey, msg, payload_size, out, out_size);
+
     case KM_EXPORT_KEY:
-        return do_dispatch(&AndroidKeymaster::ExportKey, msg, payload_size, out, out_size);
+        LOG_D("Dispatching EXPORT_KEY, size: %d", payload_size);
+        return do_dispatch(&TrustyKeymaster::ExportKey, msg, payload_size, out, out_size);
+
     case KM_GET_VERSION:
-        return do_dispatch(&AndroidKeymaster::GetVersion, msg, payload_size, out, out_size);
+        LOG_D("Dispatching GET_VERSION, size: %d", payload_size);
+        return do_dispatch(&TrustyKeymaster::GetVersion, msg, payload_size, out, out_size);
+
+    case KM_ADD_RNG_ENTROPY:
+        LOG_D("Dispatching ADD_RNG_ENTROPY, size: %d", payload_size);
+        return do_dispatch(&TrustyKeymaster::AddRngEntropy, msg, payload_size, out, out_size);
+
+    case KM_GET_SUPPORTED_ALGORITHMS:
+        LOG_D("Dispatching GET_SUPPORTED_ALGORITHMS, size: %d", payload_size);
+        return do_dispatch(&TrustyKeymaster::SupportedAlgorithms, msg, payload_size, out, out_size);
+
+    case KM_GET_SUPPORTED_BLOCK_MODES:
+        LOG_D("Dispatching GET_SUPPORTED_BLOCK_MODES, size: %d", payload_size);
+        return do_dispatch(&TrustyKeymaster::SupportedBlockModes, msg, payload_size, out, out_size);
+
+    case KM_GET_SUPPORTED_PADDING_MODES:
+        LOG_D("Dispatching GET_SUPPORTED_PADDING_MODES, size: %d", payload_size);
+        return do_dispatch(&TrustyKeymaster::SupportedPaddingModes, msg, payload_size, out,
+                           out_size);
+
+    case KM_GET_SUPPORTED_DIGESTS:
+        LOG_D("Dispatching GET_SUPPORTED_DIGESTS, size: %d", payload_size);
+        return do_dispatch(&TrustyKeymaster::SupportedDigests, msg, payload_size, out, out_size);
+
+    case KM_GET_SUPPORTED_IMPORT_FORMATS:
+        LOG_D("Dispatching GET_SUPPORTED_IMPORT_FORMATS, size: %d", payload_size);
+        return do_dispatch(&TrustyKeymaster::SupportedImportFormats, msg, payload_size, out,
+                           out_size);
+
+    case KM_GET_SUPPORTED_EXPORT_FORMATS:
+        LOG_D("Dispatching GET_SUPPORTED_EXPORT_FORMATS, size: %d", payload_size);
+        return do_dispatch(&TrustyKeymaster::SupportedExportFormats, msg, payload_size, out,
+                           out_size);
+
+    case KM_GET_KEY_CHARACTERISTICS:
+        LOG_D("Dispatching GET_KEY_CHARACTERISTICS, size: %d", payload_size);
+        return do_dispatch(&TrustyKeymaster::GetKeyCharacteristics, msg, payload_size, out,
+                           out_size);
+
+    case KM_ABORT_OPERATION:
+        LOG_D("Dispatching ABORT_OPERATION, size %d", payload_size);
+        return do_dispatch(&TrustyKeymaster::AbortOperation, msg, payload_size, out, out_size);
     default:
         return ERR_NOT_IMPLEMENTED;
     }
@@ -212,7 +265,7 @@ static bool keymaster_port_accessible(uuid_t* uuid, bool secure) {
 
 static keymaster_chan_ctx* keymaster_ctx_open(handle_t chan, uuid_t* uuid, bool secure) {
     if (!keymaster_port_accessible(uuid, secure)) {
-        LOG_E("access denied for client uuid\n", 0);
+        LOG_E("access denied for client uuid", 0);
         return NULL;
     }
 
@@ -235,7 +288,6 @@ static void keymaster_ctx_close(keymaster_chan_ctx* ctx) {
 }
 
 static long handle_msg(keymaster_chan_ctx* ctx) {
-	LOG_E("Calling into KEYMASTER!!!!\n", 0);
     handle_t chan = ctx->chan;
 
     /* get message info */
@@ -246,7 +298,7 @@ static long handle_msg(keymaster_chan_ctx* ctx) {
 
     // fatal error
     if (rc != NO_ERROR) {
-        LOG_E("failed (%d) to get_msg for chan (%d), closing connection\n", rc, chan);
+        LOG_E("failed (%d) to get_msg for chan (%d), closing connection", rc, chan);
         return rc;
     }
 
@@ -257,25 +309,26 @@ static long handle_msg(keymaster_chan_ctx* ctx) {
     msg_buf[msg_inf.len] = 0;
 
     /* read msg content */
-    iovec_t iov = { msg_buf.get(), msg_inf.len };
-    ipc_msg_t msg = { 1, &iov, 0, NULL };
+    iovec_t iov = {msg_buf.get(), msg_inf.len};
+    ipc_msg_t msg = {1, &iov, 0, NULL};
 
     rc = read_msg(chan, msg_inf.id, 0, &msg);
 
     // fatal error
     if (rc < 0) {
-        LOG_E("failed to read msg (%d)\n", rc, chan);
+        LOG_E("failed to read msg (%d)", rc, chan);
         return rc;
     }
+    LOG_D("Read %d-byte message", rc);
 
-    if (((unsigned long) rc) < sizeof(keymaster_message)) {
-        LOG_E("invalid message of size (%d)\n", rc, chan);
+    if (((unsigned long)rc) < sizeof(keymaster_message)) {
+        LOG_E("invalid message of size (%d)", rc, chan);
         return ERR_NOT_VALID;
     }
 
     UniquePtr<uint8_t[]> out_buf;
     uint32_t out_buf_size = 0;
-    keymaster_message* in_msg = reinterpret_cast<keymaster_message *>(msg_buf.get());
+    keymaster_message* in_msg = reinterpret_cast<keymaster_message*>(msg_buf.get());
 
     rc = ctx->dispatch(ctx, in_msg, msg_inf.len - sizeof(*in_msg), &out_buf, &out_buf_size);
     if (rc < 0) {
@@ -283,20 +336,21 @@ static long handle_msg(keymaster_chan_ctx* ctx) {
         return send_error_response(chan, in_msg->cmd, KM_ERROR_UNKNOWN_ERROR);
     }
 
+    LOG_D("Sending %d-byte response", out_buf_size);
     return send_response(chan, in_msg->cmd, out_buf.get(), out_buf_size);
 }
 
 static void keymaster_chan_handler(const uevent_t* ev, void* priv) {
     keymaster_chan_ctx* ctx = reinterpret_cast<keymaster_chan_ctx*>(priv);
     if (ctx == NULL) {
-        LOG_E("error: no context on channel %d\n", ev->handle);
+        LOG_E("error: no context on channel %d", ev->handle);
         close(ev->handle);
         return;
     }
 
     if ((ev->event & IPC_HANDLE_POLL_ERROR) || (ev->event & IPC_HANDLE_POLL_READY)) {
         /* close it as it is in an error state */
-        LOG_E("error event (0x%x) for chan (%d)\n", ev->event, ev->handle);
+        LOG_E("error event (0x%x) for chan (%d)", ev->event, ev->handle);
         close(ev->handle);
         return;
     }
@@ -305,7 +359,7 @@ static void keymaster_chan_handler(const uevent_t* ev, void* priv) {
         long rc = handle_msg(ctx);
         if (rc != NO_ERROR) {
             /* report an error and close channel */
-            LOG_E("failed (%d) to handle event on channel %d\n", rc, ev->handle);
+            LOG_E("failed (%d) to handle event on channel %d", rc, ev->handle);
             keymaster_ctx_close(ctx);
             return;
         }
@@ -329,21 +383,21 @@ static void keymaster_port_handler(const uevent_t* ev, void* priv, bool secure) 
         /* incoming connection: accept it */
         int rc = accept(ev->handle, &peer_uuid);
         if (rc < 0) {
-            LOG_E("failed (%d) to accept on port %d\n", rc, ev->handle);
+            LOG_E("failed (%d) to accept on port %d", rc, ev->handle);
             return;
         }
 
-        handle_t chan = (handle_t) rc;
+        handle_t chan = (handle_t)rc;
         keymaster_chan_ctx* ctx = keymaster_ctx_open(chan, &peer_uuid, secure);
         if (ctx == NULL) {
-            LOG_E("failed to allocate context on chan %d\n", chan);
+            LOG_E("failed to allocate context on chan %d", chan);
             close(chan);
             return;
         }
 
         rc = set_cookie(chan, ctx);
         if (rc < 0) {
-            LOG_E("failed (%d) to set_cookie on chan %d\n", rc, chan);
+            LOG_E("failed (%d) to set_cookie on chan %d", rc, chan);
             keymaster_ctx_close(ctx);
             return;
         }
@@ -364,7 +418,7 @@ static void dispatch_event(const uevent_t* ev) {
 
     if (ev->event == IPC_HANDLE_POLL_NONE) {
         /* not really an event, do nothing */
-        LOG_E("got an empty event\n", 0);
+        LOG_E("got an empty event", 0);
         return;
     }
 
@@ -377,7 +431,7 @@ static void dispatch_event(const uevent_t* ev) {
     }
 
     /* no handler? close it */
-    LOG_E("no handler for event (0x%x) with handle %d\n", ev->event, ev->handle);
+    LOG_E("no handler for event (0x%x) with handle %d", ev->event, ev->handle);
 
     close(ev->handle);
 
@@ -388,9 +442,10 @@ static long keymaster_ipc_init(keymaster_srv_ctx* ctx) {
     int rc;
 
     /* Initialize secure-side service */
-    rc = port_create(KEYMASTER_SECURE_PORT, 1, KEYMASTER_MAX_BUFFER_LENGTH, IPC_PORT_ALLOW_TA_CONNECT);
+    rc = port_create(KEYMASTER_SECURE_PORT, 1, KEYMASTER_MAX_BUFFER_LENGTH,
+                     IPC_PORT_ALLOW_TA_CONNECT);
     if (rc < 0) {
-        LOG_E("Failed (%d) to create port %s\n", rc, KEYMASTER_SECURE_PORT);
+        LOG_E("Failed (%d) to create port %s", rc, KEYMASTER_SECURE_PORT);
         return rc;
     }
 
@@ -398,7 +453,7 @@ static long keymaster_ipc_init(keymaster_srv_ctx* ctx) {
 
     rc = set_cookie(ctx->port_secure, &keymaster_port_evt_handler_secure);
     if (rc) {
-        LOG_E("failed (%d) to set_cookie on port %d\n", rc, ctx->port_secure);
+        LOG_E("failed (%d) to set_cookie on port %d", rc, ctx->port_secure);
         close(ctx->port_secure);
         return rc;
     }
@@ -406,7 +461,7 @@ static long keymaster_ipc_init(keymaster_srv_ctx* ctx) {
     /* initialize non-secure side service */
     rc = port_create(KEYMASTER_PORT, 1, KEYMASTER_MAX_BUFFER_LENGTH, IPC_PORT_ALLOW_NS_CONNECT);
     if (rc < 0) {
-        LOG_E("Failed (%d) to create port %s\n", rc, KEYMASTER_PORT);
+        LOG_E("Failed (%d) to create port %s", rc, KEYMASTER_PORT);
         return rc;
     }
 
@@ -414,7 +469,7 @@ static long keymaster_ipc_init(keymaster_srv_ctx* ctx) {
 
     rc = set_cookie(ctx->port_non_secure, &keymaster_port_evt_handler_non_secure);
     if (rc) {
-        LOG_E("failed (%d) to set_cookie on port %d\n", rc, ctx->port_non_secure);
+        LOG_E("failed (%d) to set_cookie on port %d", rc, ctx->port_non_secure);
         close(ctx->port_non_secure);
         return rc;
     }
@@ -430,7 +485,7 @@ int main(void) {
 
     TrustyLogger::initialize();
 
-    LOG_I("Initializing\n", 0);
+    LOG_I("Initializing", 0);
 
     keymaster_srv_ctx ctx;
     rc = keymaster_ipc_init(&ctx);
@@ -447,7 +502,7 @@ int main(void) {
 
         rc = wait_any(&event, -1);
         if (rc < 0) {
-            LOG_E("wait_any failed (%d)\n", rc);
+            LOG_E("wait_any failed (%d)", rc);
             break;
         }
 

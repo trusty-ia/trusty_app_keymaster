@@ -21,7 +21,7 @@
 #include <keymaster/logger.h>
 
 #define LOG_TAG "trusty_keymaster"
-#define KEYMASTER_LOG_LEVEL 0
+#define KEYMASTER_LOG_LEVEL WARNING_LVL
 
 namespace keymaster {
 
@@ -57,11 +57,10 @@ class TrustyLogger : public Logger {
             retval = fprintf(stderr, "%s (critical): ", LOG_TAG);
             break;
         }
-        retval += fprintf(stderr, fmt, args);
+        retval += vfprintf(stderr, fmt, args);
         retval += fprintf(stderr, "\n");
         return retval;
     }
 };
 
 }  // namespace keymaster
-
