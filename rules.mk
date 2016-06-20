@@ -17,7 +17,8 @@ LOCAL_DIR := $(GET_LOCAL_DIR)
 
 MODULE := $(LOCAL_DIR)
 
-KEYMASTER_ROOT := $(LOCAL_DIR)/../../system/keymaster
+ANDROID_ROOT := $(LOCAL_DIR)/../../..
+KEYMASTER_ROOT := $(ANDROID_ROOT)/system/keymaster
 
 MODULE_SRCS += \
 	$(KEYMASTER_ROOT)/aes_key.cpp \
@@ -56,7 +57,8 @@ MODULE_SRCS += \
 MODULE_INCLUDES := \
 	$(KEYMASTER_ROOT)/include \
 	$(KEYMASTER_ROOT) \
-	$(LOCAL_DIR)
+	$(LOCAL_DIR) \
+	$(ANDROID_ROOT)/hardware/libhardware/include
 
 MODULE_CPPFLAGS := -std=c++11
 

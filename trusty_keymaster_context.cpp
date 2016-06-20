@@ -48,6 +48,7 @@ TrustyKeymasterContext::TrustyKeymasterContext()
     aes_factory_.reset(new AesKeyFactory(this));
     hmac_factory_.reset(new HmacKeyFactory(this));
 }
+TrustyKeymasterContext::~TrustyKeymasterContext() {}
 
 KeyFactory* TrustyKeymasterContext::GetKeyFactory(keymaster_algorithm_t algorithm) const {
     switch (algorithm) {
@@ -62,6 +63,15 @@ KeyFactory* TrustyKeymasterContext::GetKeyFactory(keymaster_algorithm_t algorith
     default:
         return nullptr;
     }
+}
+
+keymaster_error_t TrustyKeymasterContext::SetSystemVersion(uint32_t os_version,
+                                                         uint32_t os_patchlevel) {
+    return KM_ERROR_UNIMPLEMENTED;
+}
+
+void TrustyKeymasterContext::GetSystemVersion(uint32_t* os_version, uint32_t* os_patchlevel) const {
+    return; //KM_ERROR_UNIMPLEMENTED
 }
 
 static keymaster_algorithm_t supported_algorithms[] = {KM_ALGORITHM_RSA, KM_ALGORITHM_EC,
@@ -230,6 +240,12 @@ keymaster_error_t TrustyKeymasterContext::CreateKeyBlob(const AuthorizationSet& 
     return SerializeAuthEncryptedBlob(encrypted_key, *hw_enforced, *sw_enforced, nonce, tag, blob);
 }
 
+keymaster_error_t TrustyKeymasterContext::UpgradeKeyBlob(const KeymasterKeyBlob& key_to_upgrade,
+                                                       const AuthorizationSet& upgrade_params,
+                                                       KeymasterKeyBlob* upgraded_key) const {
+    return KM_ERROR_UNIMPLEMENTED;
+}
+
 keymaster_error_t TrustyKeymasterContext::ParseKeyBlob(const KeymasterKeyBlob& blob,
                                                        const AuthorizationSet& additional_params,
                                                        KeymasterKeyBlob* key_material,
@@ -354,6 +370,14 @@ keymaster_error_t TrustyKeymasterContext::GetAuthTokenKey(keymaster_key_blob_t* 
     key->key_material = auth_token_key_;
     key->key_material_size = kAuthTokenKeySize;
     return KM_ERROR_OK;
+}
+
+keymaster_error_t TrustyKeymasterContext::GenerateUniqueId(
+    uint64_t /* creation_date_time */,
+    const keymaster_blob_t& /* application_id */,
+    bool /* reset_since_rotation */,
+    Buffer* /* unique_id */) const {
+    return KM_ERROR_UNIMPLEMENTED;
 }
 
 }  // namespace keymaster

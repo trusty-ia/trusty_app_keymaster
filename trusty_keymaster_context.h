@@ -34,6 +34,13 @@ static const int kAuthTokenKeySize = 32;
 class TrustyKeymasterContext : public KeymasterContext {
   public:
     TrustyKeymasterContext();
+    ~TrustyKeymasterContext() override;
+
+    keymaster_security_level_t GetSecurityLevel() const override {
+        return KM_SECURITY_LEVEL_TRUSTED_ENVIRONMENT;
+    }
+    keymaster_error_t SetSystemVersion(uint32_t os_version, uint32_t os_patchlevel) override;
+    void GetSystemVersion(uint32_t* os_version, uint32_t* os_patchlevel) const override;
 
     KeyFactory* GetKeyFactory(keymaster_algorithm_t algorithm) const override;
     OperationFactory* GetOperationFactory(keymaster_algorithm_t algorithm,
@@ -45,6 +52,10 @@ class TrustyKeymasterContext : public KeymasterContext {
                                     const KeymasterKeyBlob& key_material, KeymasterKeyBlob* blob,
                                     AuthorizationSet* hw_enforced,
                                     AuthorizationSet* sw_enforced) const override;
+
+    keymaster_error_t UpgradeKeyBlob(const KeymasterKeyBlob& key_to_upgrade,
+                                     const AuthorizationSet& upgrade_params,
+                                     KeymasterKeyBlob* upgraded_key) const override;
 
     keymaster_error_t ParseKeyBlob(const KeymasterKeyBlob& blob,
                                    const AuthorizationSet& additional_params,
@@ -70,6 +81,10 @@ class TrustyKeymasterContext : public KeymasterContext {
         *error = KM_ERROR_UNIMPLEMENTED;
         return nullptr;
     };
+
+    keymaster_error_t GenerateUniqueId(uint64_t creation_date_time,
+                                       const keymaster_blob_t& application_id,
+                                       bool reset_since_rotation, Buffer* unique_id) const override;
 
   private:
     bool SeedRngIfNeeded() const;
