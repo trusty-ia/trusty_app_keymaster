@@ -93,6 +93,11 @@ class TrustyKeymasterContext : public KeymasterContext {
     bool InitializeAuthTokenKey();
     keymaster_error_t DeriveMasterKey(KeymasterKeyBlob* master_key) const;
 
+    keymaster_error_t BuildHiddenAuthorizations(const AuthorizationSet& input_set,
+                AuthorizationSet* hidden) const;
+    bool InitRotInfo();
+    void ClearRotInfo();
+
     TrustyKeymasterEnforcement enforcement_policy_;
 
     UniquePtr<KeyFactory> aes_factory_;
@@ -101,6 +106,7 @@ class TrustyKeymasterContext : public KeymasterContext {
     UniquePtr<KeyFactory> rsa_factory_;
 
     UniquePtr<uint8_t[]> master_key_;
+    UniquePtr<uint8_t[]> root_of_trust_;
     size_t root_of_trust_size_;
     bool rng_initialized_;
     mutable int calls_since_reseed_;

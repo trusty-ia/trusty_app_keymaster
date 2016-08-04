@@ -30,6 +30,7 @@ extern "C" {
 #include "auth_encrypted_key_blob.h"
 #include "hmac_key.h"
 #include "ocb_utils.h"
+#include <trusty_std.h>
 
 namespace keymaster {
 
@@ -47,8 +48,16 @@ TrustyKeymasterContext::TrustyKeymasterContext()
     ec_factory_.reset(new EcKeyFactory(this));
     aes_factory_.reset(new AesKeyFactory(this));
     hmac_factory_.reset(new HmacKeyFactory(this));
+
+    if (!InitRotInfo()) {
+        LOG_D("TrustyKeymaster failed to initialize RotInfo", 0);
+        root_of_trust_.reset();
+        root_of_trust_size_ = 0;
+    }
 }
-TrustyKeymasterContext::~TrustyKeymasterContext() {}
+TrustyKeymasterContext::~TrustyKeymasterContext() {
+    ClearRotInfo();
+}
 
 KeyFactory* TrustyKeymasterContext::GetKeyFactory(keymaster_algorithm_t algorithm) const {
     switch (algorithm) {
@@ -186,8 +195,8 @@ static keymaster_error_t SetAuthorizations(const AuthorizationSet& key_descripti
     return KM_ERROR_OK;
 }
 
-static keymaster_error_t BuildHiddenAuthorizations(const AuthorizationSet& input_set,
-                                                   AuthorizationSet* hidden) {
+keymaster_error_t TrustyKeymasterContext::BuildHiddenAuthorizations(const AuthorizationSet& input_set,
+                                                   AuthorizationSet* hidden) const {
     keymaster_blob_t entry;
     if (input_set.GetTagValue(TAG_APPLICATION_ID, &entry))
         hidden->push_back(TAG_APPLICATION_ID, entry.data, entry.data_length);
@@ -198,6 +207,9 @@ static keymaster_error_t BuildHiddenAuthorizations(const AuthorizationSet& input
     root_of_trust.tag = KM_TAG_ROOT_OF_TRUST;
     root_of_trust.blob.data = reinterpret_cast<const uint8_t*>("Unbound");
     root_of_trust.blob.data_length = 7;
+    // TODO: there's an issue need to fix if binding the real ROT info
+    //root_of_trust.blob.data = reinterpret_cast<const uint8_t*>(root_of_trust_.get());
+    //root_of_trust.blob.data_length = root_of_trust_size_;
     hidden->push_back(root_of_trust);
 
     return TranslateAuthorizationSetError(hidden->is_valid());
@@ -353,6 +365,43 @@ keymaster_error_t TrustyKeymasterContext::DeriveMasterKey(KeymasterKeyBlob* mast
     hwkey_close(session);
     LOG_I("Key derivation complete", 0);
     return KM_ERROR_OK;
+}
+
+bool TrustyKeymasterContext::InitRotInfo(){
+    long rc = 0;
+    trusty_device_info_t info = {0};
+
+    rc = get_device_info(&info);
+    if (rc < 0) {
+        LOG_S("failed (%d) to get the device infomation\n", rc);
+        return false;
+    }
+    /* seed is not needed here,clear it for security concern */
+    memset_s(info.seed, 0, sizeof(info.seed));
+
+    if (info.size != sizeof(trusty_device_info_t)) {
+        LOG_S("trusty_device_info_t size is mismatch!\n", rc);
+        return false;
+    }
+
+    /* init the root of trust info size */
+    root_of_trust_size_ = sizeof(info.rot);
+
+    /* init the root of trust info structure */
+    root_of_trust_.reset(new uint8_t[root_of_trust_size_]);
+    memset_s(root_of_trust_.get(), 0, root_of_trust_size_);
+
+    memcpy(root_of_trust_.get(), &info.rot, root_of_trust_size_);
+
+    /* clear the sensitive data */
+    memset_s(&info, 0, sizeof(trusty_device_info_t));
+    return true;
+}
+
+void TrustyKeymasterContext::ClearRotInfo(){
+    memset_s(root_of_trust_.get(), 0, root_of_trust_size_);
+    root_of_trust_.reset();
+    root_of_trust_size_ = 0;
 }
 
 bool TrustyKeymasterContext::InitializeAuthTokenKey() {

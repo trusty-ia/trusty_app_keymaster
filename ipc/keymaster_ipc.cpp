@@ -1,5 +1,6 @@
 /*
- * Copyright (C) 2012 The Android Open Source Project
+ * Copyright (C) 2016 The Android Open Source Project
+ * Copyright (C) 2016 Intel Corporation
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -257,6 +258,15 @@ static long keymaster_dispatch_non_secure(keymaster_chan_ctx* ctx, keymaster_mes
     case KM_ABORT_OPERATION:
         LOG_D("Dispatching ABORT_OPERATION, size %d", payload_size);
         return do_dispatch(&TrustyKeymaster::AbortOperation, msg, payload_size, out, out_size);
+
+    case KM_DELETE_KEY:
+        LOG_D("Dispatching KM_DELETE_KEY, size: %d", payload_size);
+        return do_dispatch(&TrustyKeymaster::DeleteKey, msg, payload_size, out, out_size);
+
+    case KM_DELETE_ALL_KEYS:
+        LOG_D("Dispatching KM_DELETE_ALL_KEYS, size %d", payload_size);
+        return do_dispatch(&TrustyKeymaster::DeleteAllKeys, msg, payload_size, out, out_size);
+
     default:
         return ERR_NOT_IMPLEMENTED;
     }
@@ -484,9 +494,9 @@ int main(void) {
     long rc;
     uevent_t event;
 
-    device = new TrustyKeymaster(new TrustyKeymasterContext, 16);
-
     TrustyLogger::initialize();
+
+    device = new TrustyKeymaster(new TrustyKeymasterContext, 18);
 
     LOG_I("Initializing", 0);
 
