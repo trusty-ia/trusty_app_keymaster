@@ -35,6 +35,17 @@ class TrustyKeymasterContext : public KeymasterContext {
   public:
     TrustyKeymasterContext();
 
+    keymaster_security_level_t GetSecurityLevel() const override {
+        return KM_SECURITY_LEVEL_TRUSTED_ENVIRONMENT;
+    }
+
+    keymaster_error_t SetSystemVersion(uint32_t /* os_version */,
+                                       uint32_t /* os_patchlevel */) override {
+        return KM_ERROR_UNIMPLEMENTED;
+    }
+
+    void GetSystemVersion(uint32_t* os_version, uint32_t* os_patchlevel) const {};
+
     KeyFactory* GetKeyFactory(keymaster_algorithm_t algorithm) const override;
     OperationFactory* GetOperationFactory(keymaster_algorithm_t algorithm,
                                           keymaster_purpose_t purpose) const override;
@@ -45,6 +56,12 @@ class TrustyKeymasterContext : public KeymasterContext {
                                     const KeymasterKeyBlob& key_material, KeymasterKeyBlob* blob,
                                     AuthorizationSet* hw_enforced,
                                     AuthorizationSet* sw_enforced) const override;
+
+    keymaster_error_t UpgradeKeyBlob(const KeymasterKeyBlob& key_to_upgrade,
+                                     const AuthorizationSet& upgrade_params,
+                                     KeymasterKeyBlob* upgraded_key) const override {
+        return KM_ERROR_UNIMPLEMENTED;
+    }
 
     keymaster_error_t ParseKeyBlob(const KeymasterKeyBlob& blob,
                                    const AuthorizationSet& additional_params,
@@ -60,16 +77,23 @@ class TrustyKeymasterContext : public KeymasterContext {
     KeymasterEnforcement* enforcement_policy() /* override */ { return &enforcement_policy_; }
 
     EVP_PKEY* AttestationKey(keymaster_algorithm_t algorithm,
-                             keymaster_error_t* error) const override{
+                             keymaster_error_t* error) const override {
         *error = KM_ERROR_UNIMPLEMENTED;
         return nullptr;
     };
 
     keymaster_cert_chain_t* AttestationChain(keymaster_algorithm_t algorithm,
-                                             keymaster_error_t* error) const override{
+                                             keymaster_error_t* error) const override {
         *error = KM_ERROR_UNIMPLEMENTED;
         return nullptr;
     };
+
+    keymaster_error_t GenerateUniqueId(uint64_t creation_date_time,
+                                       const keymaster_blob_t& application_id,
+                                       bool reset_since_rotation,
+                                       Buffer* unique_id) const override {
+        return KM_ERROR_UNIMPLEMENTED;
+    }
 
   private:
     bool SeedRngIfNeeded() const;

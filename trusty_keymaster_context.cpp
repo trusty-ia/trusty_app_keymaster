@@ -120,6 +120,7 @@ static keymaster_error_t SetAuthorizations(const AuthorizationSet& key_descripti
         case KM_TAG_ORIGIN:
         case KM_TAG_RESET_SINCE_ID_ROTATION:
         case KM_TAG_ALLOW_WHILE_ON_BODY:
+        case KM_TAG_ATTESTATION_CHALLENGE:
             // Ignore these.
             break;
 

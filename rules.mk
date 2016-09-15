@@ -49,9 +49,9 @@ MODULE_SRCS += \
 	$(KEYMASTER_ROOT)/rsa_operation.cpp \
 	$(KEYMASTER_ROOT)/serializable.cpp \
 	$(KEYMASTER_ROOT)/symmetric_key.cpp \
+	$(LOCAL_DIR)/manifest.c \
 	$(LOCAL_DIR)/trusty_keymaster_context.cpp \
-	$(LOCAL_DIR)/trusty_keymaster_enforcement.cpp \
-	$(LOCAL_DIR)/manifest.c
+	$(LOCAL_DIR)/trusty_keymaster_enforcement.cpp
 
 MODULE_INCLUDES := \
 	$(KEYMASTER_ROOT)/include \
@@ -67,7 +67,8 @@ MODULE_DEPS += \
 	lib/libc-trusty \
 	lib/libstdc++-trusty \
 	lib/rng \
-	lib/hwkey
+	lib/hwkey \
+	openssl
 
 include $(LOCAL_DIR)/$(IPC)/rules.mk
 
