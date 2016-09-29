@@ -206,11 +206,9 @@ keymaster_error_t TrustyKeymasterContext::BuildHiddenAuthorizations(const Author
 
     keymaster_key_param_t root_of_trust;
     root_of_trust.tag = KM_TAG_ROOT_OF_TRUST;
-    root_of_trust.blob.data = reinterpret_cast<const uint8_t*>("Unbound");
-    root_of_trust.blob.data_length = 7;
-    // TODO: there's an issue need to fix if binding the real ROT info
-    //root_of_trust.blob.data = reinterpret_cast<const uint8_t*>(root_of_trust_.get());
-    //root_of_trust.blob.data_length = root_of_trust_size_;
+
+    root_of_trust.blob.data = reinterpret_cast<const uint8_t*>(root_of_trust_.get());
+    root_of_trust.blob.data_length = root_of_trust_size_;
     hidden->push_back(root_of_trust);
 
     return TranslateAuthorizationSetError(hidden->is_valid());
