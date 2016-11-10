@@ -370,13 +370,11 @@ bool TrustyKeymasterContext::InitRotInfo(){
     long rc = 0;
     trusty_device_info_t info = {0};
 
-    rc = get_device_info(&info);
+    rc = get_device_info(&info, false);
     if (rc < 0) {
         LOG_S("failed (%d) to get the device infomation\n", rc);
         return false;
     }
-    /* seed is not needed here,clear it for security concern */
-    memset_s(info.seed, 0, sizeof(info.seed));
 
     if (info.size != sizeof(trusty_device_info_t)) {
         LOG_S("trusty_device_info_t size is mismatch!\n", rc);
