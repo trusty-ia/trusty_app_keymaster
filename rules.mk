@@ -59,7 +59,7 @@ MODULE_INCLUDES := \
 	$(KEYMASTER_ROOT) \
 	$(LOCAL_DIR)
 
-MODULE_CPPFLAGS := -std=c++11
+MODULE_CPPFLAGS := -std=c++11 -fno-short-enums
 
 MODULE_COMPILEFLAGS := -U__ANDROID__
 
