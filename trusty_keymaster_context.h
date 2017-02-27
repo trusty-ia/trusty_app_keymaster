@@ -110,7 +110,6 @@ class TrustyKeymasterContext : public KeymasterContext {
     UniquePtr<KeyFactory> rsa_factory_;
 
     UniquePtr<uint8_t[]> master_key_;
-    size_t root_of_trust_size_;
     bool rng_initialized_;
     mutable int calls_since_reseed_;
     uint8_t auth_token_key_[kAuthTokenKeySize];
