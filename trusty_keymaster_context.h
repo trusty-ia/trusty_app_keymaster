@@ -44,7 +44,7 @@ class TrustyKeymasterContext : public KeymasterContext {
         return KM_ERROR_UNIMPLEMENTED;
     }
 
-    void GetSystemVersion(uint32_t* os_version, uint32_t* os_patchlevel) const {};
+    void GetSystemVersion(uint32_t* os_version, uint32_t* os_patchlevel) const override {};
 
     KeyFactory* GetKeyFactory(keymaster_algorithm_t algorithm) const override;
     OperationFactory* GetOperationFactory(keymaster_algorithm_t algorithm,
@@ -74,7 +74,7 @@ class TrustyKeymasterContext : public KeymasterContext {
 
     keymaster_error_t GetAuthTokenKey(keymaster_key_blob_t* key) const;
 
-    KeymasterEnforcement* enforcement_policy() /* override */ { return &enforcement_policy_; }
+    KeymasterEnforcement* enforcement_policy() override { return &enforcement_policy_; }
 
     EVP_PKEY* AttestationKey(keymaster_algorithm_t algorithm,
                              keymaster_error_t* error) const override {
