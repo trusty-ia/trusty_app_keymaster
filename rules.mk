@@ -60,7 +60,8 @@ MODULE_INCLUDES := \
 	$(LOCAL_DIR) \
 	$(ANDROID_ROOT)/hardware/libhardware/include
 
-MODULE_CPPFLAGS := -std=c++11
+MODULE_CPPFLAGS := -std=c++11 \
+	-mpreferred-stack-boundary=5 -mstackrealign
 
 IPC := ipc
 
