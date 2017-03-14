@@ -20,6 +20,7 @@
 #include <keymaster/logger.h>
 
 #include "trusty_keymaster_context.h"
+#include "trusty_keymaster_messages.h"
 
 namespace keymaster {
 
@@ -30,16 +31,13 @@ class TrustyKeymaster : public AndroidKeymaster {
         LOG_D("Creating TrustyKeymaster", 0);
     }
 
-    long GetAuthTokenKey(keymaster_key_blob_t* key) {
-        keymaster_error_t error = context_->GetAuthTokenKey(key);
-        if (error != KM_ERROR_OK)
-            return ERR_GENERIC;
-        return NO_ERROR;
-    }
+    long GetAuthTokenKey(keymaster_key_blob_t* key);
+
+    void SetBootParams(const SetBootParamsRequest& request,
+                       SetBootParamsResponse* response);
 
   private:
     TrustyKeymasterContext* context_;
 };
 
 }  // namespace
-

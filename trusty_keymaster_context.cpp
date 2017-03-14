@@ -30,6 +30,7 @@ extern "C" {
 #include "auth_encrypted_key_blob.h"
 #include "hmac_key.h"
 #include "ocb_utils.h"
+#include "openssl_err.h"
 
 namespace keymaster {
 
@@ -354,6 +355,25 @@ keymaster_error_t TrustyKeymasterContext::GetAuthTokenKey(keymaster_key_blob_t* 
 
     key->key_material = auth_token_key_;
     key->key_material_size = kAuthTokenKeySize;
+    return KM_ERROR_OK;
+}
+
+keymaster_error_t TrustyKeymasterContext::SetBootParams(
+    uint32_t os_version, uint32_t os_patchlevel, const Buffer& verified_boot_key,
+    keymaster_verified_boot_t verified_boot_state, bool device_locked) {
+    if (boot_params_set_)
+        return KM_ERROR_ROOT_OF_TRUST_ALREADY_SET;
+    boot_params_set_ = true;
+    boot_os_version_ = os_version;
+    boot_os_patchlevel_ = os_patchlevel;
+
+    // If no verified boot key hash is passed, then verified boot state is considered
+    // unverified and unlocked.
+    if (verified_boot_key.buffer_size()) {
+        verified_boot_key_.Reinitialize(verified_boot_key);
+        verified_boot_state_ = verified_boot_state;
+        device_locked_ = device_locked;
+    }
     return KM_ERROR_OK;
 }
 

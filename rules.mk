@@ -51,6 +51,7 @@ MODULE_SRCS += \
 	$(KEYMASTER_ROOT)/symmetric_key.cpp \
 	$(KEYMASTER_ROOT)/keymaster_tags.cpp \
 	$(LOCAL_DIR)/manifest.c \
+	$(LOCAL_DIR)/trusty_keymaster.cpp \
 	$(LOCAL_DIR)/trusty_keymaster_context.cpp \
 	$(LOCAL_DIR)/trusty_keymaster_enforcement.cpp
 

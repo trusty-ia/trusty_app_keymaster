@@ -120,8 +120,8 @@ static long send_error_response(handle_t chan, uint32_t cmd, keymaster_error_t e
     return send_response(chan, cmd, reinterpret_cast<uint8_t*>(&err), sizeof(err));
 }
 
-template <typename Request, typename Response>
-static long do_dispatch(void (AndroidKeymaster::*operation)(const Request&, Response*),
+template <typename Keymaster, typename Request, typename Response>
+static long do_dispatch(void (Keymaster::*operation)(const Request&, Response*),
                         struct keymaster_message* msg, uint32_t payload_size,
                         UniquePtr<uint8_t[]>* out, uint32_t* out_size) {
     const uint8_t* payload = msg->payload;
@@ -188,7 +188,6 @@ static long keymaster_dispatch_secure(keymaster_chan_ctx* ctx, keymaster_message
 static long keymaster_dispatch_non_secure(keymaster_chan_ctx* ctx, keymaster_message* msg,
                                           uint32_t payload_size, UniquePtr<uint8_t[]>* out,
                                           uint32_t* out_size) {
-    LOG_D("Dispatching command %d", msg->cmd);
     switch (msg->cmd) {
     case KM_GENERATE_KEY:
         LOG_D("Dispatching GENERATE_KEY, size: %d", payload_size);
@@ -257,7 +256,13 @@ static long keymaster_dispatch_non_secure(keymaster_chan_ctx* ctx, keymaster_mes
     case KM_ABORT_OPERATION:
         LOG_D("Dispatching ABORT_OPERATION, size %d", payload_size);
         return do_dispatch(&TrustyKeymaster::AbortOperation, msg, payload_size, out, out_size);
+
+    case KM_SET_BOOT_PARAMS:
+        LOG_D("Dispatching SET_BOOT_PARAMS, size %d", payload_size);
+        return do_dispatch(&TrustyKeymaster::SetBootParams, msg, payload_size, out, out_size);
+
     default:
+        LOG_E("Cannot dispatch unknown command %d", msg->cmd);
         return ERR_NOT_IMPLEMENTED;
     }
 }
