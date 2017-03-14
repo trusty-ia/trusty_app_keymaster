@@ -52,6 +52,30 @@ static const int kAesKeySize = 16;
 static const int kCallsBetweenRngReseeds = 32;
 static const int kRngReseedSize = 64;
 static const uint8_t kMasterKeyDerivationData[kAesKeySize] = "KeymasterMaster";
+
+bool UpgradeIntegerTag(keymaster_tag_t tag, uint32_t value, AuthorizationSet* set,
+                       bool* set_changed) {
+    int index = set->find(tag);
+    if (index == -1) {
+        keymaster_key_param_t param;
+        param.tag = tag;
+        param.integer = value;
+        set->push_back(param);
+        *set_changed = true;
+        return true;
+    }
+
+    if (set->params[index].integer > value) {
+        return false;
+    }
+
+    if (set->params[index].integer != value) {
+        set->params[index].integer = value;
+        *set_changed = true;
+    }
+    return true;
+}
+
 }  // anonymous namespace
 
 TrustyKeymasterContext::TrustyKeymasterContext()
@@ -223,18 +247,12 @@ TrustyKeymasterContext::BuildHiddenAuthorizations(const AuthorizationSet& input_
     return TranslateAuthorizationSetError(hidden->is_valid());
 }
 
-keymaster_error_t TrustyKeymasterContext::CreateKeyBlob(const AuthorizationSet& key_description,
-                                                        keymaster_key_origin_t origin,
-                                                        const KeymasterKeyBlob& key_material,
-                                                        KeymasterKeyBlob* blob,
-                                                        AuthorizationSet* hw_enforced,
-                                                        AuthorizationSet* sw_enforced) const {
-    keymaster_error_t error = SetAuthorizations(key_description, origin, hw_enforced, sw_enforced);
-    if (error != KM_ERROR_OK)
-        return error;
-
+keymaster_error_t TrustyKeymasterContext::CreateAuthEncryptedKeyBlob(
+    const AuthorizationSet& key_description, const KeymasterKeyBlob& key_material,
+    const AuthorizationSet& hw_enforced, const AuthorizationSet& sw_enforced,
+    KeymasterKeyBlob* blob) const {
     AuthorizationSet hidden;
-    error = BuildHiddenAuthorizations(key_description, &hidden);
+    keymaster_error_t error = BuildHiddenAuthorizations(key_description, &hidden);
     if (error != KM_ERROR_OK)
         return error;
 
@@ -254,10 +272,68 @@ keymaster_error_t TrustyKeymasterContext::CreateKeyBlob(const AuthorizationSet& 
     nonce.advance_write(OCB_NONCE_LENGTH);
 
     KeymasterKeyBlob encrypted_key;
-    error = OcbEncryptKey(*hw_enforced, *sw_enforced, hidden, master_key, key_material, nonce,
+    error = OcbEncryptKey(hw_enforced, sw_enforced, hidden, master_key, key_material, nonce,
                           &encrypted_key, &tag);
+    if (error != KM_ERROR_OK)
+        return error;
 
-    return SerializeAuthEncryptedBlob(encrypted_key, *hw_enforced, *sw_enforced, nonce, tag, blob);
+    return SerializeAuthEncryptedBlob(encrypted_key, hw_enforced, sw_enforced, nonce, tag, blob);
+}
+
+keymaster_error_t TrustyKeymasterContext::CreateKeyBlob(const AuthorizationSet& key_description,
+                                                        keymaster_key_origin_t origin,
+                                                        const KeymasterKeyBlob& key_material,
+                                                        KeymasterKeyBlob* blob,
+                                                        AuthorizationSet* hw_enforced,
+                                                        AuthorizationSet* sw_enforced) const {
+    keymaster_error_t error = SetAuthorizations(key_description, origin, hw_enforced, sw_enforced);
+    if (error != KM_ERROR_OK)
+        return error;
+
+    return CreateAuthEncryptedKeyBlob(key_description, key_material, *hw_enforced, *sw_enforced,
+                                      blob);
+}
+
+keymaster_error_t TrustyKeymasterContext::UpgradeKeyBlob(const KeymasterKeyBlob& key_to_upgrade,
+                                                         const AuthorizationSet& upgrade_params,
+                                                         KeymasterKeyBlob* upgraded_key) const {
+    KeymasterKeyBlob key_material;
+    AuthorizationSet hw_enforced;
+    AuthorizationSet sw_enforced;
+    keymaster_error_t error =
+        ParseKeyBlob(key_to_upgrade, upgrade_params, &key_material, &hw_enforced, &sw_enforced);
+    if (error != KM_ERROR_OK)
+        return error;
+
+    bool set_changed = false;
+
+    if (boot_os_version_ == 0) {
+        // We need to allow "upgrading" OS version to zero, to support upgrading from proper
+        // numbered releases to unnumbered development and preview releases.
+
+        int key_os_version_pos = sw_enforced.find(TAG_OS_VERSION);
+        if (key_os_version_pos != -1) {
+            uint32_t key_os_version = sw_enforced[key_os_version_pos].integer;
+            if (key_os_version != 0) {
+                sw_enforced[key_os_version_pos].integer = boot_os_version_;
+                set_changed = true;
+            }
+        }
+    }
+
+    if (!UpgradeIntegerTag(TAG_OS_VERSION, boot_os_version_, &hw_enforced, &set_changed) ||
+        !UpgradeIntegerTag(TAG_OS_PATCHLEVEL, boot_os_patchlevel_, &hw_enforced, &set_changed)) {
+        // One of the version fields would have been a downgrade. Not allowed.
+        return KM_ERROR_INVALID_ARGUMENT;
+    }
+
+    if (!set_changed) {
+        // Don't need an upgrade.
+        return KM_ERROR_OK;
+    }
+
+    return CreateAuthEncryptedKeyBlob(upgrade_params, key_material, hw_enforced, sw_enforced,
+                                      upgraded_key);
 }
 
 keymaster_error_t TrustyKeymasterContext::ParseKeyBlob(const KeymasterKeyBlob& blob,

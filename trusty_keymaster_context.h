@@ -59,9 +59,7 @@ class TrustyKeymasterContext : public KeymasterContext {
 
     keymaster_error_t UpgradeKeyBlob(const KeymasterKeyBlob& key_to_upgrade,
                                      const AuthorizationSet& upgrade_params,
-                                     KeymasterKeyBlob* upgraded_key) const override {
-        return KM_ERROR_UNIMPLEMENTED;
-    }
+                                     KeymasterKeyBlob* upgraded_key) const override;
 
     keymaster_error_t ParseKeyBlob(const KeymasterKeyBlob& blob,
                                    const AuthorizationSet& additional_params,
@@ -112,6 +110,18 @@ class TrustyKeymasterContext : public KeymasterContext {
     keymaster_error_t BuildHiddenAuthorizations(const AuthorizationSet& input_set,
                                                 AuthorizationSet* hidden) const;
     keymaster_error_t DeriveMasterKey(KeymasterKeyBlob* master_key) const;
+    /*
+     * CreateAuthEncryptedKeyBlob takes a key description authorization set, key material,
+     * and hardware and software authorization sets and produces an encrypted and
+     * integrity-checked key blob.
+     *
+     * This method is called by CreateKeyBlob and UpgradeKeyBlob.
+     */
+    keymaster_error_t CreateAuthEncryptedKeyBlob(const AuthorizationSet& key_description,
+                                                 const KeymasterKeyBlob& key_material,
+                                                 const AuthorizationSet& hw_enforced,
+                                                 const AuthorizationSet& sw_enforced,
+                                                 KeymasterKeyBlob* blob) const;
 
     TrustyKeymasterEnforcement enforcement_policy_;
 
