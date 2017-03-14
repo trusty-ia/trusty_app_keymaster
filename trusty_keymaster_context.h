@@ -39,17 +39,17 @@ class TrustyKeymasterContext : public KeymasterContext {
         return KM_SECURITY_LEVEL_TRUSTED_ENVIRONMENT;
     }
 
-    keymaster_error_t SetSystemVersion(uint32_t /* os_version */,
-                                       uint32_t /* os_patchlevel */) override {
-        return KM_ERROR_UNIMPLEMENTED;
-    }
-
-    void GetSystemVersion(uint32_t* os_version, uint32_t* os_patchlevel) const override {};
+    keymaster_error_t SetSystemVersion(uint32_t os_version, uint32_t os_patchlevel) override;
+    void GetSystemVersion(uint32_t* os_version, uint32_t* os_patchlevel) const override;
 
     KeyFactory* GetKeyFactory(keymaster_algorithm_t algorithm) const override;
     OperationFactory* GetOperationFactory(keymaster_algorithm_t algorithm,
                                           keymaster_purpose_t purpose) const override;
     keymaster_algorithm_t* GetSupportedAlgorithms(size_t* algorithms_count) const override;
+
+    keymaster_error_t GetVerifiedBootParams(keymaster_blob_t* verified_boot_key,
+                                            keymaster_verified_boot_t* verified_boot_state,
+                                            bool* device_locked) const override;
 
     keymaster_error_t CreateKeyBlob(const AuthorizationSet& key_description,
                                     keymaster_key_origin_t origin,
@@ -105,6 +105,12 @@ class TrustyKeymasterContext : public KeymasterContext {
     bool ShouldReseedRng() const;
     bool ReseedRng();
     bool InitializeAuthTokenKey();
+    keymaster_error_t SetAuthorizations(const AuthorizationSet& key_description,
+                                        keymaster_key_origin_t origin,
+                                        AuthorizationSet* hw_enforced,
+                                        AuthorizationSet* sw_enforced) const;
+    keymaster_error_t BuildHiddenAuthorizations(const AuthorizationSet& input_set,
+                                                AuthorizationSet* hidden) const;
     keymaster_error_t DeriveMasterKey(KeymasterKeyBlob* master_key) const;
 
     TrustyKeymasterEnforcement enforcement_policy_;

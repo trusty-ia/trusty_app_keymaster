@@ -32,6 +32,19 @@ extern "C" {
 #include "ocb_utils.h"
 #include "openssl_err.h"
 
+
+/**
+ * Defining KEYMASTER_DEBUG will do the following:
+ *
+ * - Allow configure() to succeed without root of trust from bootloader
+ * - Pass Attestation CTS tests
+ */
+//#define KEYMASTER_DEBUG
+
+#ifdef KEYMASTER_DEBUG
+#warning "Compiling with fake Keymaster Root of Trust values! DO NOT SHIP THIS!"
+#endif
+
 namespace keymaster {
 
 namespace {
@@ -48,6 +61,7 @@ TrustyKeymasterContext::TrustyKeymasterContext()
     ec_factory_.reset(new EcKeyFactory(this));
     aes_factory_.reset(new AesKeyFactory(this));
     hmac_factory_.reset(new HmacKeyFactory(this));
+    verified_boot_key_.Reinitialize("Unbound", 7);
 }
 
 KeyFactory* TrustyKeymasterContext::GetKeyFactory(keymaster_algorithm_t algorithm) const {
@@ -94,10 +108,10 @@ static keymaster_error_t TranslateAuthorizationSetError(AuthorizationSet::Error 
     return KM_ERROR_OK;
 }
 
-static keymaster_error_t SetAuthorizations(const AuthorizationSet& key_description,
-                                           keymaster_key_origin_t origin,
-                                           AuthorizationSet* hw_enforced,
-                                           AuthorizationSet* sw_enforced) {
+keymaster_error_t TrustyKeymasterContext::SetAuthorizations(const AuthorizationSet& key_description,
+                                                            keymaster_key_origin_t origin,
+                                                            AuthorizationSet* hw_enforced,
+                                                            AuthorizationSet* sw_enforced) const {
     sw_enforced->Clear();
     hw_enforced->Clear();
 
@@ -122,6 +136,8 @@ static keymaster_error_t SetAuthorizations(const AuthorizationSet& key_descripti
         case KM_TAG_RESET_SINCE_ID_ROTATION:
         case KM_TAG_ALLOW_WHILE_ON_BODY:
         case KM_TAG_ATTESTATION_CHALLENGE:
+        case KM_TAG_OS_VERSION:
+        case KM_TAG_OS_PATCHLEVEL:
             // Ignore these.
             break;
 
@@ -161,8 +177,6 @@ static keymaster_error_t SetAuthorizations(const AuthorizationSet& key_descripti
         case KM_TAG_CREATION_DATETIME:
         case KM_TAG_INCLUDE_UNIQUE_ID:
         case KM_TAG_EXPORTABLE:
-        case KM_TAG_OS_VERSION:
-        case KM_TAG_OS_PATCHLEVEL:
 
             sw_enforced->push_back(entry);
             break;
@@ -170,6 +184,9 @@ static keymaster_error_t SetAuthorizations(const AuthorizationSet& key_descripti
     }
 
     hw_enforced->push_back(TAG_ORIGIN, origin);
+    // these values will be 0 if not set by bootloader
+    hw_enforced->push_back(TAG_OS_VERSION, boot_os_version_);
+    hw_enforced->push_back(TAG_OS_PATCHLEVEL, boot_os_patchlevel_);
 
     if (sw_enforced->is_valid() != AuthorizationSet::OK)
         return TranslateAuthorizationSetError(sw_enforced->is_valid());
@@ -178,18 +195,29 @@ static keymaster_error_t SetAuthorizations(const AuthorizationSet& key_descripti
     return KM_ERROR_OK;
 }
 
-static keymaster_error_t BuildHiddenAuthorizations(const AuthorizationSet& input_set,
-                                                   AuthorizationSet* hidden) {
+keymaster_error_t
+TrustyKeymasterContext::BuildHiddenAuthorizations(const AuthorizationSet& input_set,
+                                                  AuthorizationSet* hidden) const {
     keymaster_blob_t entry;
     if (input_set.GetTagValue(TAG_APPLICATION_ID, &entry))
         hidden->push_back(TAG_APPLICATION_ID, entry.data, entry.data_length);
     if (input_set.GetTagValue(TAG_APPLICATION_DATA, &entry))
         hidden->push_back(TAG_APPLICATION_DATA, entry.data, entry.data_length);
 
+    // Copy verified boot key, verified boot state, and device lock state to hidden
+    // authorization set for binding to key.
     keymaster_key_param_t root_of_trust;
     root_of_trust.tag = KM_TAG_ROOT_OF_TRUST;
-    root_of_trust.blob.data = reinterpret_cast<const uint8_t*>("Unbound");
-    root_of_trust.blob.data_length = 7;
+    root_of_trust.blob.data = verified_boot_key_.begin();
+    root_of_trust.blob.data_length = verified_boot_key_.buffer_size();
+    hidden->push_back(root_of_trust);
+
+    root_of_trust.blob.data = reinterpret_cast<const uint8_t*>(&verified_boot_state_);
+    root_of_trust.blob.data_length = sizeof(verified_boot_state_);
+    hidden->push_back(root_of_trust);
+
+    root_of_trust.blob.data = reinterpret_cast<const uint8_t*>(&device_locked_);
+    root_of_trust.blob.data_length = sizeof(device_locked_);
     hidden->push_back(root_of_trust);
 
     return TranslateAuthorizationSetError(hidden->is_valid());
@@ -355,6 +383,43 @@ keymaster_error_t TrustyKeymasterContext::GetAuthTokenKey(keymaster_key_blob_t* 
 
     key->key_material = auth_token_key_;
     key->key_material_size = kAuthTokenKeySize;
+    return KM_ERROR_OK;
+}
+
+keymaster_error_t TrustyKeymasterContext::SetSystemVersion(uint32_t os_version,
+                                                           uint32_t os_patchlevel) {
+#ifndef KEYMASTER_DEBUG
+    if (!boot_params_set_ || boot_os_version_ != os_version ||
+        boot_os_patchlevel_ != os_patchlevel) {
+        return KM_ERROR_INVALID_ARGUMENT;
+    }
+#else
+    Buffer fake_root_of_trust("000111222333444555666777888999000", 32);
+    if (!boot_params_set_) {
+        /* Sets bootloader parameters to what is expected on a 'good' device, will pass
+         * attestation CTS tests. FOR DEBUGGING ONLY.
+         */
+        SetBootParams(os_version, os_patchlevel, fake_root_of_trust, KM_VERIFIED_BOOT_VERIFIED,
+                      true);
+    }
+#endif
+
+    return KM_ERROR_OK;
+}
+
+void TrustyKeymasterContext::GetSystemVersion(uint32_t* os_version, uint32_t* os_patchlevel) const {
+    *os_version = boot_os_version_;
+    *os_patchlevel = boot_os_patchlevel_;
+}
+
+keymaster_error_t
+TrustyKeymasterContext::GetVerifiedBootParams(keymaster_blob_t* verified_boot_key,
+                                              keymaster_verified_boot_t* verified_boot_state,
+                                              bool* device_locked) const {
+    verified_boot_key->data = verified_boot_key_.begin();
+    verified_boot_key->data_length = verified_boot_key_.buffer_size();
+    *verified_boot_state = verified_boot_state_;
+    *device_locked = device_locked_;
     return KM_ERROR_OK;
 }
 
