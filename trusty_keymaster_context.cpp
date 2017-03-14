@@ -15,10 +15,11 @@
  */
 
 #include "trusty_keymaster_context.h"
+#include "secure_storage.h"
 
 extern "C" {
-#include <lib/rng/trusty_rng.h>
 #include <lib/hwkey/hwkey.h>
+#include <lib/rng/trusty_rng.h>
 }
 
 #include <keymaster/android_keymaster_utils.h>
@@ -31,13 +32,14 @@ extern "C" {
 #include "hmac_key.h"
 #include "ocb_utils.h"
 #include "openssl_err.h"
+#include "test_attestation_keys.h"
 
 
 /**
  * Defining KEYMASTER_DEBUG will do the following:
  *
  * - Allow configure() to succeed without root of trust from bootloader
- * - Pass Attestation CTS tests
+ * - Allow attestation keys and certificates to be overwritten once set
  */
 //#define KEYMASTER_DEBUG
 
@@ -499,6 +501,69 @@ TrustyKeymasterContext::GetVerifiedBootParams(keymaster_blob_t* verified_boot_ke
     return KM_ERROR_OK;
 }
 
+EVP_PKEY* TrustyKeymasterContext::AttestationKey(keymaster_algorithm_t algorithm,
+                                                 keymaster_error_t* error) const {
+
+    uint8_t* key = nullptr;
+    size_t key_size = 0;
+    int evp_key_type;
+    UniquePtr<uint8_t[]> key_deleter;
+
+    switch (algorithm) {
+    case KM_ALGORITHM_RSA:
+        evp_key_type = EVP_PKEY_RSA;
+        break;
+
+    case KM_ALGORITHM_EC:
+        evp_key_type = EVP_PKEY_EC;
+        break;
+
+    default:
+        *error = KM_ERROR_UNSUPPORTED_ALGORITHM;
+        return nullptr;
+    }
+
+    *error = ReadKeyFromStorage(algorithm, &key, &key_size);
+    if (*error == KM_ERROR_OK) {
+        key_deleter.reset(key);
+    } else {
+        LOG_I("Failed to read attestation key from RPMB, falling back to test key", 0);
+        *error = GetSoftwareAttestationKey(algorithm, &key, &key_size);
+    }
+    if (*error != KM_ERROR_OK)
+        return nullptr;
+    const uint8_t* const_key = key;
+    EVP_PKEY* pkey = d2i_PrivateKey(evp_key_type, nullptr, &const_key, key_size);
+    if (!pkey)
+        *error = TranslateLastOpenSslError();
+
+    return pkey;
+}
+
+keymaster_cert_chain_t* TrustyKeymasterContext::AttestationChain(keymaster_algorithm_t algorithm,
+                                                                 keymaster_error_t* error) const {
+
+    UniquePtr<keymaster_cert_chain_t, CertificateChainDelete> chain(new keymaster_cert_chain_t);
+    if (!chain.get()) {
+        *error = KM_ERROR_MEMORY_ALLOCATION_FAILED;
+        return nullptr;
+    }
+    if (algorithm != KM_ALGORITHM_RSA && algorithm != KM_ALGORITHM_EC) {
+        *error = KM_ERROR_UNSUPPORTED_ALGORITHM;
+        return nullptr;
+    }
+    memset(chain.get(), 0, sizeof(keymaster_cert_chain_t));
+
+    *error = ReadCertChainFromStorage(algorithm, chain.get());
+    if (*error != KM_ERROR_OK) {
+        LOG_I("Failed to read attestation chain from RPMB, falling back to test chain", 0);
+        *error = GetSoftwareAttestationChain(algorithm, chain.get());
+    }
+    if (*error != KM_ERROR_OK)
+        return nullptr;
+    return chain.release();
+}
+
 keymaster_error_t TrustyKeymasterContext::SetBootParams(
     uint32_t os_version, uint32_t os_patchlevel, const Buffer& verified_boot_key,
     keymaster_verified_boot_t verified_boot_state, bool device_locked) {
@@ -516,6 +581,52 @@ keymaster_error_t TrustyKeymasterContext::SetBootParams(
         device_locked_ = device_locked;
     }
     return KM_ERROR_OK;
+}
+
+keymaster_error_t TrustyKeymasterContext::SetAttestKey(keymaster_algorithm_t algorithm,
+                                                       const uint8_t* key, uint32_t key_size) {
+    if (algorithm != KM_ALGORITHM_RSA && algorithm != KM_ALGORITHM_EC) {
+        return KM_ERROR_UNSUPPORTED_ALGORITHM;
+    }
+    if (key_size == 0) {
+        return KM_ERROR_INVALID_INPUT_LENGTH;
+    }
+    bool exists;
+    keymaster_error_t error = AttestationKeyExists(algorithm, &exists);
+    if (error != KM_ERROR_OK) {
+        return error;
+    }
+#ifndef KEYMASTER_DEBUG
+    if (exists) {
+        return KM_ERROR_UNKNOWN_ERROR;
+    }
+#endif
+    return WriteKeyToStorage(algorithm, key, key_size);
+}
+
+keymaster_error_t TrustyKeymasterContext::AppendAttestCertChain(keymaster_algorithm_t algorithm,
+                                                                const uint8_t* cert,
+                                                                uint32_t cert_size) {
+    if (algorithm != KM_ALGORITHM_RSA && algorithm != KM_ALGORITHM_EC) {
+        return KM_ERROR_UNSUPPORTED_ALGORITHM;
+    }
+    if (cert_size == 0) {
+        return KM_ERROR_INVALID_INPUT_LENGTH;
+    }
+    uint32_t cert_chain_length;
+    keymaster_error_t error = ReadCertChainLength(algorithm, &cert_chain_length);
+    if (error != KM_ERROR_OK) {
+        cert_chain_length = 0;
+    }
+    if (cert_chain_length >= kMaxCertChainLength) {
+#ifndef KEYMASTER_DEBUG
+        return KM_ERROR_UNKNOWN_ERROR;
+#else
+        // If debug flag is enabled, reset cert_chain_length when it hits max
+        cert_chain_length = 0;
+#endif
+    }
+    return WriteCertToStorage(algorithm, cert, cert_size, cert_chain_length);
 }
 
 }  // namespace keymaster

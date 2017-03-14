@@ -45,6 +45,8 @@ enum keymaster_command {
 	KM_CONFIGURE                     = (18 << KEYMASTER_REQ_SHIFT),
 
 	KM_SET_BOOT_PARAMS               = (0x1000 << KEYMASTER_REQ_SHIFT),
+	KM_SET_ATTESTATION_KEY           = (0x2000 << KEYMASTER_REQ_SHIFT),
+	KM_APPEND_ATTESTATION_CERT_CHAIN = (0x3000 << KEYMASTER_REQ_SHIFT),
 };
 
 #ifdef __ANDROID__

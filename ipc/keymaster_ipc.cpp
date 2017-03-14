@@ -198,6 +198,8 @@ static long keymaster_dispatch_non_secure(keymaster_chan_ctx* ctx, keymaster_mes
     // If configure has been called and failed, always return the same error
     if (msg->cmd != KM_GET_VERSION &&
         msg->cmd != KM_SET_BOOT_PARAMS &&
+        msg->cmd != KM_SET_ATTESTATION_KEY &&
+        msg->cmd != KM_APPEND_ATTESTATION_CERT_CHAIN &&
         ((!device->ConfigureCalled() && msg->cmd != KM_CONFIGURE) ||
         (device->ConfigureCalled() && device->get_configure_error() != KM_ERROR_OK))) {
         return ERR_NOT_CONFIGURED;
@@ -287,6 +289,15 @@ static long keymaster_dispatch_non_secure(keymaster_chan_ctx* ctx, keymaster_mes
     case KM_SET_BOOT_PARAMS:
         LOG_D("Dispatching SET_BOOT_PARAMS, size %d", payload_size);
         return do_dispatch(&TrustyKeymaster::SetBootParams, msg, payload_size, out, out_size);
+
+    case KM_SET_ATTESTATION_KEY:
+        LOG_D("Dispatching SET_ATTESTION_KEY, size %d", payload_size);
+        return do_dispatch(&TrustyKeymaster::SetAttestationKey, msg, payload_size, out, out_size);
+
+    case KM_APPEND_ATTESTATION_CERT_CHAIN:
+        LOG_D("Dispatching SET_ATTESTATION_CERT_CHAIN, size %d", payload_size);
+        return do_dispatch(&TrustyKeymaster::AppendAttestationCertChain, msg, payload_size, out,
+                           out_size);
 
     default:
         LOG_E("Cannot dispatch unknown command %d", msg->cmd);

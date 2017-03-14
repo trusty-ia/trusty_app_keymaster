@@ -35,6 +35,10 @@ class TrustyKeymaster : public AndroidKeymaster {
 
     void SetBootParams(const SetBootParamsRequest& request,
                        SetBootParamsResponse* response);
+    void SetAttestationKey(const SetAttestationKeyRequest& request,
+                           SetAttestationKeyResponse* response);
+    void AppendAttestationCertChain(const AppendAttestationCertChainRequest& request,
+                                    AppendAttestationCertChainResponse* response);
 
     bool ConfigureCalled() { return configure_error_ != KM_ERROR_KEYMASTER_NOT_CONFIGURED; }
     keymaster_error_t get_configure_error() { return configure_error_; }

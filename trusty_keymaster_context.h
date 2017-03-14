@@ -30,6 +30,7 @@ namespace keymaster {
 class KeyFactory;
 
 static const int kAuthTokenKeySize = 32;
+static const int kMaxCertChainLength = 3;
 
 class TrustyKeymasterContext : public KeymasterContext {
   public:
@@ -75,16 +76,10 @@ class TrustyKeymasterContext : public KeymasterContext {
     KeymasterEnforcement* enforcement_policy() override { return &enforcement_policy_; }
 
     EVP_PKEY* AttestationKey(keymaster_algorithm_t algorithm,
-                             keymaster_error_t* error) const override {
-        *error = KM_ERROR_UNIMPLEMENTED;
-        return nullptr;
-    };
+                             keymaster_error_t* error) const override;
 
     keymaster_cert_chain_t* AttestationChain(keymaster_algorithm_t algorithm,
-                                             keymaster_error_t* error) const override {
-        *error = KM_ERROR_UNIMPLEMENTED;
-        return nullptr;
-    };
+                                             keymaster_error_t* error) const override;
 
     keymaster_error_t GenerateUniqueId(uint64_t creation_date_time,
                                        const keymaster_blob_t& application_id,
@@ -97,6 +92,12 @@ class TrustyKeymasterContext : public KeymasterContext {
                                     const Buffer& verified_boot_key,
                                     keymaster_verified_boot_t verified_boot_state,
                                     bool device_locked);
+
+    keymaster_error_t SetAttestKey(keymaster_algorithm_t algorithm, const uint8_t* key,
+                                   uint32_t key_size);
+
+    keymaster_error_t AppendAttestCertChain(keymaster_algorithm_t algorithm, const uint8_t* cert,
+                                            uint32_t cert_size);
 
   private:
     bool SeedRngIfNeeded() const;

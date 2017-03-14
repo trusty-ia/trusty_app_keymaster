@@ -37,4 +37,24 @@ void TrustyKeymaster::SetBootParams(const SetBootParamsRequest& request,
                                               request.device_locked);
 }
 
+void TrustyKeymaster::SetAttestationKey(const SetAttestationKeyRequest& request,
+                                        SetAttestationKeyResponse* response) {
+    if (response == nullptr)
+        return;
+    size_t key_size = request.key_data.buffer_size();
+    const uint8_t* key = request.key_data.begin();
+
+    response->error = context_->SetAttestKey(request.algorithm, key, key_size);
+}
+
+void TrustyKeymaster::AppendAttestationCertChain(const AppendAttestationCertChainRequest& request,
+                                                 AppendAttestationCertChainResponse* response) {
+    if (response == nullptr)
+        return;
+    size_t cert_size = request.cert_data.buffer_size();
+    const uint8_t* cert = request.cert_data.begin();
+
+    response->error = context_->AppendAttestCertChain(request.algorithm, cert, cert_size);
+}
+
 }  // namespace keymaster
