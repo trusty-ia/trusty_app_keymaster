@@ -36,8 +36,13 @@ class TrustyKeymaster : public AndroidKeymaster {
     void SetBootParams(const SetBootParamsRequest& request,
                        SetBootParamsResponse* response);
 
+    bool ConfigureCalled() { return configure_error_ != KM_ERROR_KEYMASTER_NOT_CONFIGURED; }
+    keymaster_error_t get_configure_error() { return configure_error_; }
+    void set_configure_error(keymaster_error_t err) { configure_error_ = err; }
+
   private:
     TrustyKeymasterContext* context_;
+    keymaster_error_t configure_error_ = KM_ERROR_KEYMASTER_NOT_CONFIGURED;
 };
 
 }  // namespace

@@ -140,6 +140,10 @@ static long do_dispatch(void (Keymaster::*operation)(const Request&, Response*),
         return ERR_NOT_ENOUGH_BUFFER;
     }
 
+    if (msg->cmd == KM_CONFIGURE) {
+        device->set_configure_error(rsp.error);
+    }
+
     out->reset(new uint8_t[*out_size]);
     if (out->get() == NULL) {
         *out_size = 0;
@@ -188,6 +192,17 @@ static long keymaster_dispatch_secure(keymaster_chan_ctx* ctx, keymaster_message
 static long keymaster_dispatch_non_secure(keymaster_chan_ctx* ctx, keymaster_message* msg,
                                           uint32_t payload_size, UniquePtr<uint8_t[]>* out,
                                           uint32_t* out_size) {
+    // Always allow KM_GET_VERSION to dispatch
+    // Always allow commands from from bootloader to dispatch
+    // If configure has not been called, only allow KM_CONFIGURE
+    // If configure has been called and failed, always return the same error
+    if (msg->cmd != KM_GET_VERSION &&
+        msg->cmd != KM_SET_BOOT_PARAMS &&
+        ((!device->ConfigureCalled() && msg->cmd != KM_CONFIGURE) ||
+        (device->ConfigureCalled() && device->get_configure_error() != KM_ERROR_OK))) {
+        return ERR_NOT_CONFIGURED;
+    }
+
     switch (msg->cmd) {
     case KM_GENERATE_KEY:
         LOG_D("Dispatching GENERATE_KEY, size: %d", payload_size);
@@ -256,6 +271,18 @@ static long keymaster_dispatch_non_secure(keymaster_chan_ctx* ctx, keymaster_mes
     case KM_ABORT_OPERATION:
         LOG_D("Dispatching ABORT_OPERATION, size %d", payload_size);
         return do_dispatch(&TrustyKeymaster::AbortOperation, msg, payload_size, out, out_size);
+
+    case KM_ATTEST_KEY:
+        LOG_D("Dispatching ATTEST_KEY, size %d", payload_size);
+        return do_dispatch(&TrustyKeymaster::AttestKey, msg, payload_size, out, out_size);
+
+    case KM_UPGRADE_KEY:
+        LOG_D("Dispatching UPGRADE_KEY, size %d", payload_size);
+        return do_dispatch(&TrustyKeymaster::UpgradeKey, msg, payload_size, out, out_size);
+
+    case KM_CONFIGURE:
+        LOG_D("Dispatching CONFIGURE, size %d", payload_size);
+        return do_dispatch(&TrustyKeymaster::Configure, msg, payload_size, out, out_size);
 
     case KM_SET_BOOT_PARAMS:
         LOG_D("Dispatching SET_BOOT_PARAMS, size %d", payload_size);
@@ -339,7 +366,10 @@ static long handle_msg(keymaster_chan_ctx* ctx) {
     keymaster_message* in_msg = reinterpret_cast<keymaster_message*>(msg_buf.get());
 
     rc = ctx->dispatch(ctx, in_msg, msg_inf.len - sizeof(*in_msg), &out_buf, &out_buf_size);
-    if (rc < 0) {
+    if (rc == ERR_NOT_CONFIGURED) {
+        LOG_E("configure error (%d)", rc);
+        return send_error_response(chan, in_msg->cmd, device->get_configure_error());
+    } else if (rc < 0) {
         LOG_E("error handling message (%d)", rc);
         return send_error_response(chan, in_msg->cmd, KM_ERROR_UNKNOWN_ERROR);
     }
