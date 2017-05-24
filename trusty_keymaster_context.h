@@ -30,11 +30,11 @@ namespace keymaster {
 class KeyFactory;
 
 static const int kAuthTokenKeySize = 32;
+static const int kMaxCertChainLength = 3;
 
 class TrustyKeymasterContext : public KeymasterContext {
   public:
     TrustyKeymasterContext();
-    ~TrustyKeymasterContext() override;
 
     keymaster_security_level_t GetSecurityLevel() const override {
         return KM_SECURITY_LEVEL_TRUSTED_ENVIRONMENT;
@@ -46,6 +46,10 @@ class TrustyKeymasterContext : public KeymasterContext {
     OperationFactory* GetOperationFactory(keymaster_algorithm_t algorithm,
                                           keymaster_purpose_t purpose) const override;
     keymaster_algorithm_t* GetSupportedAlgorithms(size_t* algorithms_count) const override;
+
+    keymaster_error_t GetVerifiedBootParams(keymaster_blob_t* verified_boot_key,
+                                                keymaster_verified_boot_t* verified_boot_state,
+                                                bool* device_locked) const override;
 
     keymaster_error_t CreateKeyBlob(const AuthorizationSet& key_description,
                                     keymaster_key_origin_t origin,
@@ -71,32 +75,57 @@ class TrustyKeymasterContext : public KeymasterContext {
     KeymasterEnforcement* enforcement_policy() /* override */ { return &enforcement_policy_; }
 
     EVP_PKEY* AttestationKey(keymaster_algorithm_t algorithm,
-                             keymaster_error_t* error) const override{
-        *error = KM_ERROR_UNIMPLEMENTED;
-        return nullptr;
-    };
+                             keymaster_error_t* error) const override;
 
     keymaster_cert_chain_t* AttestationChain(keymaster_algorithm_t algorithm,
-                                             keymaster_error_t* error) const override{
-        *error = KM_ERROR_UNIMPLEMENTED;
-        return nullptr;
-    };
+                                             keymaster_error_t* error) const override;
 
     keymaster_error_t GenerateUniqueId(uint64_t creation_date_time,
-                                       const keymaster_blob_t& application_id,
-                                       bool reset_since_rotation, Buffer* unique_id) const override;
+                                           const keymaster_blob_t& application_id,
+                                           bool reset_since_rotation,
+                                           Buffer* unique_id) const override {
+        return KM_ERROR_UNIMPLEMENTED;
+    }
+
+    keymaster_error_t SetBootParams(uint32_t os_version, uint32_t os_patchlevel,
+                                      const Buffer& verified_boot_key,
+                                      keymaster_verified_boot_t verified_boot_state,
+                                      bool device_locked);
+
+    keymaster_error_t SetAttestKey(keymaster_algorithm_t algorithm, const uint8_t* key,
+                                     uint32_t key_size);
+
+    keymaster_error_t AppendAttestCertChain(keymaster_algorithm_t algorithm, const uint8_t* cert,
+                                      uint32_t cert_size);
 
   private:
     bool SeedRngIfNeeded() const;
     bool ShouldReseedRng() const;
     bool ReseedRng();
     bool InitializeAuthTokenKey();
-    keymaster_error_t DeriveMasterKey(KeymasterKeyBlob* master_key) const;
+
+    keymaster_error_t SetAuthorizations(const AuthorizationSet& key_description,
+                                        keymaster_key_origin_t origin,
+                                        AuthorizationSet* hw_enforced,
+                                        AuthorizationSet* sw_enforced) const;
 
     keymaster_error_t BuildHiddenAuthorizations(const AuthorizationSet& input_set,
-                AuthorizationSet* hidden) const;
-    bool InitRotInfo();
-    void ClearRotInfo();
+                                                AuthorizationSet* hidden) const;
+
+    keymaster_error_t DeriveMasterKey(KeymasterKeyBlob* master_key) const;
+
+    /*
+    * CreateAuthEncryptedKeyBlob takes a key description authorization set, key material,
+    * and hardware and software authorization sets and produces an encrypted and
+    * integrity-checked key blob.
+    *
+    * This method is called by CreateKeyBlob and UpgradeKeyBlob.
+    */
+    keymaster_error_t CreateAuthEncryptedKeyBlob(const AuthorizationSet& key_description,
+                                                     const KeymasterKeyBlob& key_material,
+                                                     const AuthorizationSet& hw_enforced,
+                                                     const AuthorizationSet& sw_enforced,
+                                                     KeymasterKeyBlob* blob) const;
 
     TrustyKeymasterEnforcement enforcement_policy_;
 
@@ -105,13 +134,20 @@ class TrustyKeymasterContext : public KeymasterContext {
     UniquePtr<KeyFactory> hmac_factory_;
     UniquePtr<KeyFactory> rsa_factory_;
 
-    UniquePtr<uint8_t[]> master_key_;
-    UniquePtr<uint8_t[]> root_of_trust_;
-    size_t root_of_trust_size_;
     bool rng_initialized_;
     mutable int calls_since_reseed_;
     uint8_t auth_token_key_[kAuthTokenKeySize];
     bool auth_token_key_initialized_;
+
+    bool boot_params_set_ = false;
+    uint32_t boot_os_version_ = 0;
+    uint32_t boot_os_patchlevel_ = 0;
+    Buffer verified_boot_key_;
+    keymaster_verified_boot_t verified_boot_state_ = KM_VERIFIED_BOOT_UNVERIFIED;
+    bool device_locked_ = false;
+
+    uint32_t rsa_attest_cert_chain_length_ = 0;
+    uint32_t ec_attest_cert_chain_length_ = 0;
 };
 
 }  // namespace keymaster

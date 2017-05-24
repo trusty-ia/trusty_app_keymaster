@@ -51,8 +51,11 @@ MODULE_SRCS += \
 	$(KEYMASTER_ROOT)/serializable.cpp \
 	$(KEYMASTER_ROOT)/symmetric_key.cpp \
 	$(LOCAL_DIR)/manifest.c \
+	$(LOCAL_DIR)/test_attestation_keys.cpp \
+	$(LOCAL_DIR)/trusty_keymaster.cpp \
 	$(LOCAL_DIR)/trusty_keymaster_context.cpp \
-	$(LOCAL_DIR)/trusty_keymaster_enforcement.cpp
+	$(LOCAL_DIR)/trusty_keymaster_enforcement.cpp \
+	$(LOCAL_DIR)/secure_storage.cpp
 
 MODULE_INCLUDES := \
 	$(KEYMASTER_ROOT)/include \
@@ -61,7 +64,7 @@ MODULE_INCLUDES := \
 	$(ANDROID_ROOT)/hardware/libhardware/include
 
 MODULE_CPPFLAGS := -std=c++11 \
-	-mpreferred-stack-boundary=5 -mstackrealign
+	-mpreferred-stack-boundary=5 -mstackrealign -fno-short-enums
 
 IPC := ipc
 
@@ -70,6 +73,7 @@ MODULE_DEPS += \
 	lib/libc-trusty \
 	lib/libstdc++-trusty \
 	lib/rng \
+	lib/storage \
 	lib/hwkey
 
 include $(LOCAL_DIR)/$(IPC)/rules.mk

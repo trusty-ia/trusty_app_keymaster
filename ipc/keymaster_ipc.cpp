@@ -121,8 +121,8 @@ static long send_error_response(handle_t chan, uint32_t cmd, keymaster_error_t e
     return send_response(chan, cmd, reinterpret_cast<uint8_t*>(&err), sizeof(err));
 }
 
-template <typename Request, typename Response>
-static long do_dispatch(void (AndroidKeymaster::*operation)(const Request&, Response*),
+template <typename Keymaster, typename Request, typename Response>
+static long do_dispatch(void (Keymaster::*operation)(const Request&, Response*),
                         struct keymaster_message* msg, uint32_t payload_size,
                         UniquePtr<uint8_t[]>* out, uint32_t* out_size) {
     const uint8_t* payload = msg->payload;
@@ -139,6 +139,10 @@ static long do_dispatch(void (AndroidKeymaster::*operation)(const Request&, Resp
     if (*out_size > KEYMASTER_MAX_BUFFER_LENGTH) {
         *out_size = 0;
         return ERR_NOT_ENOUGH_BUFFER;
+    }
+
+    if (msg->cmd == KM_CONFIGURE) {
+        device->set_configure_error(rsp.error);
     }
 
     out->reset(new uint8_t[*out_size]);
@@ -189,7 +193,22 @@ static long keymaster_dispatch_secure(keymaster_chan_ctx* ctx, keymaster_message
 static long keymaster_dispatch_non_secure(keymaster_chan_ctx* ctx, keymaster_message* msg,
                                           uint32_t payload_size, UniquePtr<uint8_t[]>* out,
                                           uint32_t* out_size) {
-    LOG_D("Dispatching command %d", msg->cmd);
+/* TODO: remove the #if 0 later!
+ * comment out of this, to make it be compitble with km1.0 API for temporary.*/
+#if 0
+    // Always allow KM_GET_VERSION to dispatch
+    // Always allow commands from from bootloader to dispatch
+    // If configure has not been called, only allow KM_CONFIGURE
+    // If configure has been called and failed, always return the same error
+    if (msg->cmd != KM_GET_VERSION &&
+        msg->cmd != KM_SET_BOOT_PARAMS &&
+        msg->cmd != KM_SET_ATTESTATION_KEY &&
+        msg->cmd != KM_APPEND_ATTESTATION_CERT_CHAIN &&
+        ((!device->ConfigureCalled() && msg->cmd != KM_CONFIGURE) ||
+        (device->ConfigureCalled() && device->get_configure_error() != KM_ERROR_OK))) {
+        return ERR_NOT_CONFIGURED;
+    }
+#endif
     switch (msg->cmd) {
     case KM_GENERATE_KEY:
         LOG_D("Dispatching GENERATE_KEY, size: %d", payload_size);
@@ -260,14 +279,40 @@ static long keymaster_dispatch_non_secure(keymaster_chan_ctx* ctx, keymaster_mes
         return do_dispatch(&TrustyKeymaster::AbortOperation, msg, payload_size, out, out_size);
 
     case KM_DELETE_KEY:
-        LOG_D("Dispatching KM_DELETE_KEY, size: %d", payload_size);
+        LOG_D("Dispatching DELETE_KEY, size %d", payload_size);
         return do_dispatch(&TrustyKeymaster::DeleteKey, msg, payload_size, out, out_size);
 
     case KM_DELETE_ALL_KEYS:
-        LOG_D("Dispatching KM_DELETE_ALL_KEYS, size %d", payload_size);
+        LOG_D("Dispatching DELETE_ALL_KEYS, size %d", payload_size);
         return do_dispatch(&TrustyKeymaster::DeleteAllKeys, msg, payload_size, out, out_size);
 
+    case KM_ATTEST_KEY:
+        LOG_D("Dispatching ATTEST_KEY, size %d", payload_size);
+        return do_dispatch(&TrustyKeymaster::AttestKey, msg, payload_size, out, out_size);
+
+    case KM_UPGRADE_KEY:
+        LOG_D("Dispatching UPGRADE_KEY, size %d", payload_size);
+        return do_dispatch(&TrustyKeymaster::UpgradeKey, msg, payload_size, out, out_size);
+
+    case KM_CONFIGURE:
+        LOG_D("Dispatching CONFIGURE, size %d", payload_size);
+        return do_dispatch(&TrustyKeymaster::Configure, msg, payload_size, out, out_size);
+
+    case KM_SET_BOOT_PARAMS:
+        LOG_D("Dispatching SET_BOOT_PARAMS, size %d", payload_size);
+        return do_dispatch(&TrustyKeymaster::SetBootParams, msg, payload_size, out, out_size);
+
+    case KM_SET_ATTESTATION_KEY:
+        LOG_D("Dispatching SET_ATTESTION_KEY, size %d", payload_size);
+        return do_dispatch(&TrustyKeymaster::SetAttestationKey, msg, payload_size, out, out_size);
+
+    case KM_APPEND_ATTESTATION_CERT_CHAIN:
+        LOG_D("Dispatching SET_ATTESTATION_CERT_CHAIN, size %d", payload_size);
+        return do_dispatch(&TrustyKeymaster::AppendAttestationCertChain, msg, payload_size, out,
+                           out_size);
+
     default:
+        LOG_E("Cannot dispatch unknown command %d", msg->cmd);
         return ERR_NOT_IMPLEMENTED;
     }
 }
@@ -344,7 +389,10 @@ static long handle_msg(keymaster_chan_ctx* ctx) {
     keymaster_message* in_msg = reinterpret_cast<keymaster_message*>(msg_buf.get());
 
     rc = ctx->dispatch(ctx, in_msg, msg_inf.len - sizeof(*in_msg), &out_buf, &out_buf_size);
-    if (rc < 0) {
+    if (rc == ERR_NOT_CONFIGURED) {
+        LOG_E("configure error (%d)", rc);
+        return send_error_response(chan, in_msg->cmd, device->get_configure_error());
+    } else if (rc < 0) {
         LOG_E("error handling message (%d)", rc);
         return send_error_response(chan, in_msg->cmd, KM_ERROR_UNKNOWN_ERROR);
     }

@@ -15,10 +15,11 @@
  */
 
 #include "trusty_keymaster_context.h"
+#include "secure_storage.h"
 
 extern "C" {
-#include <lib/rng/trusty_rng.h>
 #include <lib/hwkey/hwkey.h>
+#include <lib/rng/trusty_rng.h>
 }
 
 #include <keymaster/android_keymaster_utils.h>
@@ -30,7 +31,22 @@ extern "C" {
 #include "auth_encrypted_key_blob.h"
 #include "hmac_key.h"
 #include "ocb_utils.h"
-#include <trusty_std.h>
+#include "openssl_err.h"
+
+
+/**
+ * Defining KEYMASTER_DEBUG will do the following:
+ *
+ * - Allow configure() to succeed without root of trust from bootloader
+ * - Pass Attestation CTS tests using software only keys
+ * - Allow attestation keys and certificates to be overwritten once set
+ */
+//#define KEYMASTER_DEBUG
+
+#ifdef KEYMASTER_DEBUG
+#warning "Compiling with fake Keymaster Root of Trust values! DO NOT SHIP THIS!"
+#include "test_attestation_keys.h"
+#endif
 
 namespace keymaster {
 
@@ -39,6 +55,30 @@ static const int kAesKeySize = 16;
 static const int kCallsBetweenRngReseeds = 32;
 static const int kRngReseedSize = 64;
 static const uint8_t kMasterKeyDerivationData[kAesKeySize] = "KeymasterMaster";
+
+bool UpgradeIntegerTag(keymaster_tag_t tag, uint32_t value, AuthorizationSet* set,
+                       bool* set_changed) {
+    int index = set->find(tag);
+    if (index == -1) {
+        keymaster_key_param_t param;
+        param.tag = tag;
+        param.integer = value;
+        set->push_back(param);
+        *set_changed = true;
+        return true;
+    }
+
+    if (set->params[index].integer > value) {
+        return false;
+    }
+
+    if (set->params[index].integer != value) {
+        set->params[index].integer = value;
+        *set_changed = true;
+    }
+    return true;
+}
+
 }  // anonymous namespace
 
 TrustyKeymasterContext::TrustyKeymasterContext()
@@ -48,15 +88,7 @@ TrustyKeymasterContext::TrustyKeymasterContext()
     ec_factory_.reset(new EcKeyFactory(this));
     aes_factory_.reset(new AesKeyFactory(this));
     hmac_factory_.reset(new HmacKeyFactory(this));
-
-    if (!InitRotInfo()) {
-        LOG_D("TrustyKeymaster failed to initialize RotInfo", 0);
-        root_of_trust_.reset();
-        root_of_trust_size_ = 0;
-    }
-}
-TrustyKeymasterContext::~TrustyKeymasterContext() {
-    ClearRotInfo();
+    verified_boot_key_.Reinitialize("Unbound", 7);
 }
 
 KeyFactory* TrustyKeymasterContext::GetKeyFactory(keymaster_algorithm_t algorithm) const {
@@ -72,15 +104,6 @@ KeyFactory* TrustyKeymasterContext::GetKeyFactory(keymaster_algorithm_t algorith
     default:
         return nullptr;
     }
-}
-
-keymaster_error_t TrustyKeymasterContext::SetSystemVersion(uint32_t os_version,
-                                                         uint32_t os_patchlevel) {
-    return KM_ERROR_UNIMPLEMENTED;
-}
-
-void TrustyKeymasterContext::GetSystemVersion(uint32_t* os_version, uint32_t* os_patchlevel) const {
-    return; //KM_ERROR_UNIMPLEMENTED
 }
 
 static keymaster_algorithm_t supported_algorithms[] = {KM_ALGORITHM_RSA, KM_ALGORITHM_EC,
@@ -112,10 +135,10 @@ static keymaster_error_t TranslateAuthorizationSetError(AuthorizationSet::Error 
     return KM_ERROR_OK;
 }
 
-static keymaster_error_t SetAuthorizations(const AuthorizationSet& key_description,
-                                           keymaster_key_origin_t origin,
-                                           AuthorizationSet* hw_enforced,
-                                           AuthorizationSet* sw_enforced) {
+keymaster_error_t TrustyKeymasterContext::SetAuthorizations(const AuthorizationSet& key_description,
+                                                            keymaster_key_origin_t origin,
+                                                            AuthorizationSet* hw_enforced,
+                                                            AuthorizationSet* sw_enforced) const {
     sw_enforced->Clear();
     hw_enforced->Clear();
 
@@ -140,6 +163,8 @@ static keymaster_error_t SetAuthorizations(const AuthorizationSet& key_descripti
         case KM_TAG_RESET_SINCE_ID_ROTATION:
         case KM_TAG_ALLOW_WHILE_ON_BODY:
         case KM_TAG_ATTESTATION_CHALLENGE:
+        case KM_TAG_OS_VERSION:
+        case KM_TAG_OS_PATCHLEVEL:
             // Ignore these.
             break;
 
@@ -179,8 +204,6 @@ static keymaster_error_t SetAuthorizations(const AuthorizationSet& key_descripti
         case KM_TAG_CREATION_DATETIME:
         case KM_TAG_INCLUDE_UNIQUE_ID:
         case KM_TAG_EXPORTABLE:
-        case KM_TAG_OS_VERSION:
-        case KM_TAG_OS_PATCHLEVEL:
 
             sw_enforced->push_back(entry);
             break;
@@ -188,6 +211,9 @@ static keymaster_error_t SetAuthorizations(const AuthorizationSet& key_descripti
     }
 
     hw_enforced->push_back(TAG_ORIGIN, origin);
+    // these values will be 0 if not set by bootloader
+    hw_enforced->push_back(TAG_OS_VERSION, boot_os_version_);
+    hw_enforced->push_back(TAG_OS_PATCHLEVEL, boot_os_patchlevel_);
 
     if (sw_enforced->is_valid() != AuthorizationSet::OK)
         return TranslateAuthorizationSetError(sw_enforced->is_valid());
@@ -196,8 +222,9 @@ static keymaster_error_t SetAuthorizations(const AuthorizationSet& key_descripti
     return KM_ERROR_OK;
 }
 
-keymaster_error_t TrustyKeymasterContext::BuildHiddenAuthorizations(const AuthorizationSet& input_set,
-                                                   AuthorizationSet* hidden) const {
+keymaster_error_t
+TrustyKeymasterContext::BuildHiddenAuthorizations(const AuthorizationSet& input_set,
+                                                  AuthorizationSet* hidden) const {
     keymaster_blob_t entry;
     if (input_set.GetTagValue(TAG_APPLICATION_ID, &entry))
         hidden->push_back(TAG_APPLICATION_ID, entry.data, entry.data_length);
@@ -206,26 +233,19 @@ keymaster_error_t TrustyKeymasterContext::BuildHiddenAuthorizations(const Author
 
     keymaster_key_param_t root_of_trust;
     root_of_trust.tag = KM_TAG_ROOT_OF_TRUST;
-
-    root_of_trust.blob.data = reinterpret_cast<const uint8_t*>(root_of_trust_.get());
-    root_of_trust.blob.data_length = root_of_trust_size_;
+    root_of_trust.blob.data = verified_boot_key_.begin();
+    root_of_trust.blob.data_length = verified_boot_key_.buffer_size();
     hidden->push_back(root_of_trust);
 
     return TranslateAuthorizationSetError(hidden->is_valid());
 }
 
-keymaster_error_t TrustyKeymasterContext::CreateKeyBlob(const AuthorizationSet& key_description,
-                                                        keymaster_key_origin_t origin,
-                                                        const KeymasterKeyBlob& key_material,
-                                                        KeymasterKeyBlob* blob,
-                                                        AuthorizationSet* hw_enforced,
-                                                        AuthorizationSet* sw_enforced) const {
-    keymaster_error_t error = SetAuthorizations(key_description, origin, hw_enforced, sw_enforced);
-    if (error != KM_ERROR_OK)
-        return error;
-
+keymaster_error_t TrustyKeymasterContext::CreateAuthEncryptedKeyBlob(
+    const AuthorizationSet& key_description, const KeymasterKeyBlob& key_material,
+    const AuthorizationSet& hw_enforced, const AuthorizationSet& sw_enforced,
+    KeymasterKeyBlob* blob) const {
     AuthorizationSet hidden;
-    error = BuildHiddenAuthorizations(key_description, &hidden);
+    keymaster_error_t error = BuildHiddenAuthorizations(key_description, &hidden);
     if (error != KM_ERROR_OK)
         return error;
 
@@ -245,16 +265,68 @@ keymaster_error_t TrustyKeymasterContext::CreateKeyBlob(const AuthorizationSet& 
     nonce.advance_write(OCB_NONCE_LENGTH);
 
     KeymasterKeyBlob encrypted_key;
-    error = OcbEncryptKey(*hw_enforced, *sw_enforced, hidden, master_key, key_material, nonce,
+    error = OcbEncryptKey(hw_enforced, sw_enforced, hidden, master_key, key_material, nonce,
                           &encrypted_key, &tag);
+    if (error != KM_ERROR_OK)
+        return error;
 
-    return SerializeAuthEncryptedBlob(encrypted_key, *hw_enforced, *sw_enforced, nonce, tag, blob);
+    return SerializeAuthEncryptedBlob(encrypted_key, hw_enforced, sw_enforced, nonce, tag, blob);
+}
+
+keymaster_error_t TrustyKeymasterContext::CreateKeyBlob(const AuthorizationSet& key_description,
+                                                        keymaster_key_origin_t origin,
+                                                        const KeymasterKeyBlob& key_material,
+                                                        KeymasterKeyBlob* blob,
+                                                        AuthorizationSet* hw_enforced,
+                                                        AuthorizationSet* sw_enforced) const {
+    keymaster_error_t error = SetAuthorizations(key_description, origin, hw_enforced, sw_enforced);
+    if (error != KM_ERROR_OK)
+        return error;
+
+    return CreateAuthEncryptedKeyBlob(key_description, key_material, *hw_enforced, *sw_enforced,
+                                      blob);
 }
 
 keymaster_error_t TrustyKeymasterContext::UpgradeKeyBlob(const KeymasterKeyBlob& key_to_upgrade,
-                                                       const AuthorizationSet& upgrade_params,
-                                                       KeymasterKeyBlob* upgraded_key) const {
-    return KM_ERROR_UNIMPLEMENTED;
+                                                         const AuthorizationSet& upgrade_params,
+                                                         KeymasterKeyBlob* upgraded_key) const {
+    KeymasterKeyBlob key_material;
+    AuthorizationSet hw_enforced;
+    AuthorizationSet sw_enforced;
+    keymaster_error_t error =
+        ParseKeyBlob(key_to_upgrade, upgrade_params, &key_material, &hw_enforced, &sw_enforced);
+    if (error != KM_ERROR_OK)
+        return error;
+
+    bool set_changed = false;
+
+    if (boot_os_version_ == 0) {
+        // We need to allow "upgrading" OS version to zero, to support upgrading from proper
+        // numbered releases to unnumbered development and preview releases.
+
+        int key_os_version_pos = sw_enforced.find(TAG_OS_VERSION);
+        if (key_os_version_pos != -1) {
+            uint32_t key_os_version = sw_enforced[key_os_version_pos].integer;
+            if (key_os_version != 0) {
+                sw_enforced[key_os_version_pos].integer = boot_os_version_;
+                set_changed = true;
+            }
+        }
+    }
+
+    if (!UpgradeIntegerTag(TAG_OS_VERSION, boot_os_version_, &hw_enforced, &set_changed) ||
+        !UpgradeIntegerTag(TAG_OS_PATCHLEVEL, boot_os_patchlevel_, &hw_enforced, &set_changed)) {
+        // One of the version fields would have been a downgrade. Not allowed.
+        return KM_ERROR_INVALID_ARGUMENT;
+    }
+
+    if (!set_changed) {
+        // Don't need an upgrade.
+        return KM_ERROR_OK;
+    }
+
+    return CreateAuthEncryptedKeyBlob(upgrade_params, key_material, hw_enforced, sw_enforced,
+                                      upgraded_key);
 }
 
 keymaster_error_t TrustyKeymasterContext::ParseKeyBlob(const KeymasterKeyBlob& blob,
@@ -366,41 +438,6 @@ keymaster_error_t TrustyKeymasterContext::DeriveMasterKey(KeymasterKeyBlob* mast
     return KM_ERROR_OK;
 }
 
-bool TrustyKeymasterContext::InitRotInfo(){
-    long rc = 0;
-    trusty_device_info_t info = {0};
-
-    rc = get_device_info(&info, false);
-    if (rc < 0) {
-        LOG_S("failed (%d) to get the device infomation\n", rc);
-        return false;
-    }
-
-    if (info.size != sizeof(trusty_device_info_t)) {
-        LOG_S("trusty_device_info_t size is mismatch!\n", rc);
-        return false;
-    }
-
-    /* init the root of trust info size */
-    root_of_trust_size_ = sizeof(info.rot);
-
-    /* init the root of trust info structure */
-    root_of_trust_.reset(new uint8_t[root_of_trust_size_]);
-    memset_s(root_of_trust_.get(), 0, root_of_trust_size_);
-
-    memcpy(root_of_trust_.get(), &info.rot, root_of_trust_size_);
-
-    /* clear the sensitive data */
-    memset_s(&info, 0, sizeof(trusty_device_info_t));
-    return true;
-}
-
-void TrustyKeymasterContext::ClearRotInfo(){
-    memset_s(root_of_trust_.get(), 0, root_of_trust_size_);
-    root_of_trust_.reset();
-    root_of_trust_size_ = 0;
-}
-
 bool TrustyKeymasterContext::InitializeAuthTokenKey() {
     if (GenerateRandom(auth_token_key_, kAuthTokenKeySize) != KM_ERROR_OK)
         return false;
@@ -418,12 +455,164 @@ keymaster_error_t TrustyKeymasterContext::GetAuthTokenKey(keymaster_key_blob_t* 
     return KM_ERROR_OK;
 }
 
-keymaster_error_t TrustyKeymasterContext::GenerateUniqueId(
-    uint64_t /* creation_date_time */,
-    const keymaster_blob_t& /* application_id */,
-    bool /* reset_since_rotation */,
-    Buffer* /* unique_id */) const {
-    return KM_ERROR_UNIMPLEMENTED;
+keymaster_error_t TrustyKeymasterContext::SetSystemVersion(uint32_t os_version,
+                                                           uint32_t os_patchlevel) {
+#ifndef KEYMASTER_DEBUG
+    if (!boot_params_set_ || boot_os_version_ != os_version ||
+        boot_os_patchlevel_ != os_patchlevel) {
+        return KM_ERROR_INVALID_ARGUMENT;
+    }
+#else
+    Buffer fake_root_of_trust("000111222333444555666777888999000", 32);
+    if (!boot_params_set_) {
+        /* Sets bootloader parameters to what is expected on a 'good' device, will pass
+         * attestation CTS tests. FOR DEBUGGING ONLY.
+         */
+        SetBootParams(os_version, os_patchlevel, fake_root_of_trust, KM_VERIFIED_BOOT_VERIFIED,
+                      true);
+    }
+#endif
+
+    return KM_ERROR_OK;
+}
+
+void TrustyKeymasterContext::GetSystemVersion(uint32_t* os_version, uint32_t* os_patchlevel) const {
+    *os_version = boot_os_version_;
+    *os_patchlevel = boot_os_patchlevel_;
+}
+
+keymaster_error_t
+TrustyKeymasterContext::GetVerifiedBootParams(keymaster_blob_t* verified_boot_key,
+                                              keymaster_verified_boot_t* verified_boot_state,
+                                              bool* device_locked) const {
+    verified_boot_key->data = verified_boot_key_.begin();
+    verified_boot_key->data_length = verified_boot_key_.buffer_size();
+    *verified_boot_state = verified_boot_state_;
+    *device_locked = device_locked_;
+    return KM_ERROR_OK;
+}
+
+EVP_PKEY* TrustyKeymasterContext::AttestationKey(keymaster_algorithm_t algorithm,
+                                                 keymaster_error_t* error) const {
+
+    uint8_t* key = nullptr;
+    uint32_t key_size = 0;
+    int evp_key_type;
+    UniquePtr<uint8_t[]> key_deleter;
+
+    switch (algorithm) {
+    case KM_ALGORITHM_RSA:
+        evp_key_type = EVP_PKEY_RSA;
+        break;
+
+    case KM_ALGORITHM_EC:
+        evp_key_type = EVP_PKEY_EC;
+        break;
+
+    default:
+        *error = KM_ERROR_UNSUPPORTED_ALGORITHM;
+        return nullptr;
+    }
+
+#ifndef KEYMASTER_DEBUG
+    *error = ReadKeyFromStorage(algorithm, &key, &key_size);
+    if (key_size == 0)
+        *error = KM_ERROR_UNKNOWN_ERROR;
+    key_deleter.reset(key);
+#else
+    *error = GetSoftwareAttestationKey(algorithm, &key, &key_size);
+#endif
+    if (*error != KM_ERROR_OK)
+        return nullptr;
+    const uint8_t* const_key = key;
+    EVP_PKEY* pkey = d2i_PrivateKey(evp_key_type, nullptr, &const_key, key_size);
+    if (!pkey)
+        *error = TranslateLastOpenSslError();
+
+    return pkey;
+}
+
+keymaster_cert_chain_t* TrustyKeymasterContext::AttestationChain(keymaster_algorithm_t algorithm,
+                                                                 keymaster_error_t* error) const {
+
+    UniquePtr<keymaster_cert_chain_t, CertificateChainDelete> chain(new keymaster_cert_chain_t);
+    if (!chain.get()) {
+        *error = KM_ERROR_MEMORY_ALLOCATION_FAILED;
+        return nullptr;
+    }
+    if (algorithm != KM_ALGORITHM_RSA && algorithm != KM_ALGORITHM_EC) {
+        *error = KM_ERROR_UNSUPPORTED_ALGORITHM;
+        return nullptr;
+    }
+    memset(chain.get(), 0, sizeof(keymaster_cert_chain_t));
+
+#ifndef KEYMASTER_DEBUG
+    *error = ReadCertChainFromStorage(algorithm, chain.get());
+#else
+    *error = GetSoftwareAttestationChain(algorithm, chain.get());
+#endif
+    if (*error != KM_ERROR_OK)
+        return nullptr;
+    return chain.release();
+}
+
+keymaster_error_t TrustyKeymasterContext::SetBootParams(
+    uint32_t os_version, uint32_t os_patchlevel, const Buffer& verified_boot_key,
+    keymaster_verified_boot_t verified_boot_state, bool device_locked) {
+    if (boot_params_set_)
+        return KM_ERROR_ROOT_OF_TRUST_ALREADY_SET;
+    boot_params_set_ = true;
+    boot_os_version_ = os_version;
+    boot_os_patchlevel_ = os_patchlevel;
+
+    // If no verified boot key hash is passed, then verified boot state is considered
+    // unverified and unlocked.
+    if (verified_boot_key.buffer_size()) {
+        verified_boot_key_.Reinitialize(verified_boot_key);
+        verified_boot_state_ = verified_boot_state;
+        device_locked_ = device_locked;
+    }
+    return KM_ERROR_OK;
+}
+
+keymaster_error_t TrustyKeymasterContext::SetAttestKey(keymaster_algorithm_t algorithm,
+                                                       const uint8_t* key, uint32_t key_size) {
+    if (algorithm != KM_ALGORITHM_RSA && algorithm != KM_ALGORITHM_EC) {
+        return KM_ERROR_UNSUPPORTED_ALGORITHM;
+    }
+    bool exists;
+    keymaster_error_t error = AttestationKeyExists(algorithm, &exists);
+    if (error != KM_ERROR_OK) {
+        return error;
+    }
+#ifndef KEYMASTER_DEBUG
+    if (exists) {
+        return KM_ERROR_UNKNOWN_ERROR;
+    }
+#endif
+    return WriteKeyToStorage(algorithm, key, key_size);
+}
+
+keymaster_error_t TrustyKeymasterContext::AppendAttestCertChain(keymaster_algorithm_t algorithm,
+                                                                const uint8_t* cert,
+                                                                uint32_t cert_size) {
+    if (algorithm != KM_ALGORITHM_RSA && algorithm != KM_ALGORITHM_EC) {
+        return KM_ERROR_UNSUPPORTED_ALGORITHM;
+    }
+    uint32_t cert_chain_length;
+    keymaster_error_t error = ReadCertChainLength(algorithm, &cert_chain_length);
+    if (error != KM_ERROR_OK) {
+        return error;
+    }
+    if (cert_chain_length >= kMaxCertChainLength) {
+#ifndef KEYMASTER_DEBUG
+        return KM_ERROR_UNKNOWN_ERROR;
+#else
+        // If debug flag is enabled, reset cert_chain_length when it hits max
+        cert_chain_length = 0;
+#endif
+    }
+    return WriteCertToStorage(algorithm, cert, cert_size, cert_chain_length);
 }
 
 }  // namespace keymaster
