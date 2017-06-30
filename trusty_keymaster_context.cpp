@@ -201,7 +201,6 @@ keymaster_error_t TrustyKeymasterContext::SetAuthorizations(const AuthorizationS
         case KM_TAG_USAGE_EXPIRE_DATETIME:
         case KM_TAG_USER_ID:
         case KM_TAG_ALL_USERS:
-        case KM_TAG_CREATION_DATETIME:
         case KM_TAG_INCLUDE_UNIQUE_ID:
         case KM_TAG_EXPORTABLE:
 
@@ -210,6 +209,7 @@ keymaster_error_t TrustyKeymasterContext::SetAuthorizations(const AuthorizationS
         }
     }
 
+    sw_enforced->push_back(TAG_CREATION_DATETIME, java_time(time(NULL)));
     hw_enforced->push_back(TAG_ORIGIN, origin);
     // these values will be 0 if not set by bootloader
     hw_enforced->push_back(TAG_OS_VERSION, boot_os_version_);
