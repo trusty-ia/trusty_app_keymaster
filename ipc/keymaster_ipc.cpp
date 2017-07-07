@@ -100,19 +100,62 @@ static long handle_port_errors(const uevent_t* ev) {
     return NO_ERROR;
 }
 
-static long send_response(handle_t chan, uint32_t cmd, uint8_t* out_buf, uint32_t out_buf_size) {
-    struct keymaster_message km_msg;
-    km_msg.cmd = cmd | KM_RESP_BIT;
-    iovec_t iov[2] = {{&km_msg, sizeof(km_msg)}, {out_buf, out_buf_size}};
-    ipc_msg_t msg = {2, iov, 0, NULL};
+static int wait_to_send(handle_t session, struct ipc_msg *msg)
+{
+    int rc;
+    struct uevent ev = {0};
 
-    long rc = send_msg(chan, &msg);
-
-    // fatal error
+    rc = wait(session, &ev, -1);
     if (rc < 0) {
-        LOG_E("failed (%d) to send_msg for chan (%d)", rc, chan);
+        LOG_E("failed to wait for outgoing queue to free up\n", 0);
         return rc;
     }
+
+    if (ev.event & IPC_HANDLE_POLL_SEND_UNBLOCKED) {
+        return send_msg(session, msg);
+    }
+
+    if (ev.event & IPC_HANDLE_POLL_MSG) {
+        return ERR_BUSY;
+    }
+
+    if (ev.event & IPC_HANDLE_POLL_HUP) {
+        return ERR_CHANNEL_CLOSED;
+    }
+
+    return rc;
+}
+
+static long send_response(handle_t chan, uint32_t cmd, uint8_t* out_buf, uint32_t out_buf_size) {
+    struct keymaster_message km_msg;
+    km_msg.cmd = cmd | KEYMASTER_RESP_BIT;
+    iovec_t iov[2] = {{&km_msg, sizeof(km_msg)}, {}};
+    ipc_msg_t msg = {2, iov, 0, NULL};
+    uint32_t msg_size;
+    uint32_t bytes_remaining = out_buf_size;
+    uint32_t bytes_sent = 0;
+    uint32_t max_msg_size = KEYMASTER_MAX_BUFFER_LENGTH-64;
+
+    do {
+        msg_size = MIN(max_msg_size, bytes_remaining);
+        if (msg_size == bytes_remaining) {
+            km_msg.cmd = km_msg.cmd | KEYMASTER_STOP_BIT;
+        }
+        iov[1] = {out_buf + bytes_sent, msg_size};
+
+        long rc = send_msg(chan, &msg);
+        if (rc == ERR_NOT_ENOUGH_BUFFER) {
+            rc = wait_to_send(chan, &msg);
+        }
+
+        // fatal error
+        if (rc < 0) {
+            LOG_E("failed (%d) to send_msg for chan (%d)", rc, chan);
+            return rc;
+        }
+        bytes_remaining -= msg_size;
+        bytes_sent += msg_size;
+    } while (bytes_remaining);
 
     return NO_ERROR;
 }
@@ -136,10 +179,6 @@ static long do_dispatch(void (Keymaster::*operation)(const Request&, Response*),
     (device->*operation)(req, &rsp);
 
     *out_size = rsp.SerializedSize();
-    if (*out_size > KEYMASTER_MAX_BUFFER_LENGTH) {
-        *out_size = 0;
-        return ERR_NOT_ENOUGH_BUFFER;
-    }
 
     if (msg->cmd == KM_CONFIGURE) {
         device->set_configure_error(rsp.error);
