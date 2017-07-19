@@ -26,7 +26,7 @@ extern "C" {
 
 #include "trusty_keymaster_context.h"
 #include "trusty_logger.h"
-#include <UniquePtr.h>
+#include <keymaster/UniquePtr.h>
 
 namespace keymaster {
 
