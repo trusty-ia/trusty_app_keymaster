@@ -32,20 +32,19 @@ extern "C" {
 #include "hmac_key.h"
 #include "ocb_utils.h"
 #include "openssl_err.h"
+#include "test_attestation_keys.h"
 
 
 /**
  * Defining KEYMASTER_DEBUG will do the following:
  *
  * - Allow configure() to succeed without root of trust from bootloader
- * - Pass Attestation CTS tests using software only keys
  * - Allow attestation keys and certificates to be overwritten once set
  */
 //#define KEYMASTER_DEBUG
 
 #ifdef KEYMASTER_DEBUG
 #warning "Compiling with fake Keymaster Root of Trust values! DO NOT SHIP THIS!"
-#include "test_attestation_keys.h"
 #endif
 
 namespace keymaster {
@@ -231,10 +230,20 @@ TrustyKeymasterContext::BuildHiddenAuthorizations(const AuthorizationSet& input_
     if (input_set.GetTagValue(TAG_APPLICATION_DATA, &entry))
         hidden->push_back(TAG_APPLICATION_DATA, entry.data, entry.data_length);
 
+    // Copy verified boot key, verified boot state, and device lock state to hidden
+    // authorization set for binding to key.
     keymaster_key_param_t root_of_trust;
     root_of_trust.tag = KM_TAG_ROOT_OF_TRUST;
     root_of_trust.blob.data = verified_boot_key_.begin();
     root_of_trust.blob.data_length = verified_boot_key_.buffer_size();
+    hidden->push_back(root_of_trust);
+
+    root_of_trust.blob.data = reinterpret_cast<const uint8_t*>(&verified_boot_state_);
+    root_of_trust.blob.data_length = sizeof(verified_boot_state_);
+    hidden->push_back(root_of_trust);
+
+    root_of_trust.blob.data = reinterpret_cast<const uint8_t*>(&device_locked_);
+    root_of_trust.blob.data_length = sizeof(device_locked_);
     hidden->push_back(root_of_trust);
 
     return TranslateAuthorizationSetError(hidden->is_valid());
@@ -513,18 +522,22 @@ EVP_PKEY* TrustyKeymasterContext::AttestationKey(keymaster_algorithm_t algorithm
         *error = KM_ERROR_UNSUPPORTED_ALGORITHM;
         return nullptr;
     }
-
-#ifndef KEYMASTER_DEBUG
+#if 0  //TODO: there's some issue obout this API, need the debug later
     *error = ReadKeyFromStorage(algorithm, &key, &key_size);
-    if (key_size == 0)
-        *error = KM_ERROR_UNKNOWN_ERROR;
-    key_deleter.reset(key);
-#else
-    *error = GetSoftwareAttestationKey(algorithm, &key, &key_size);
+    if (*error == KM_ERROR_OK) {
+        key_deleter.reset(key);
+    } else {
+        LOG_E("Failed to read attestation key from RPMB, falling back to test key", 0);
+        *error = GetSoftwareAttestationKey(algorithm, &key, &key_size);
+    }
 #endif
+    LOG_E("Failed to read attestation key from RPMB, falling back to test key", 0);
+    *error = GetSoftwareAttestationKey(algorithm, &key, &key_size);
+
     if (*error != KM_ERROR_OK)
         return nullptr;
     const uint8_t* const_key = key;
+
     EVP_PKEY* pkey = d2i_PrivateKey(evp_key_type, nullptr, &const_key, key_size);
     if (!pkey)
         *error = TranslateLastOpenSslError();
@@ -546,11 +559,16 @@ keymaster_cert_chain_t* TrustyKeymasterContext::AttestationChain(keymaster_algor
     }
     memset(chain.get(), 0, sizeof(keymaster_cert_chain_t));
 
-#ifndef KEYMASTER_DEBUG
+#if 0  //TODO: there's some issue obout this API, need the debug later
     *error = ReadCertChainFromStorage(algorithm, chain.get());
-#else
-    *error = GetSoftwareAttestationChain(algorithm, chain.get());
+    if (*error != KM_ERROR_OK) {
+        LOG_E("Failed to read attestation chain from RPMB, falling back to test chain", 0);
+        *error = GetSoftwareAttestationChain(algorithm, chain.get());
+    }
 #endif
+    LOG_E("Failed to read attestation chain from RPMB, falling back to test chain", 0);
+    *error = GetSoftwareAttestationChain(algorithm, chain.get());
+
     if (*error != KM_ERROR_OK)
         return nullptr;
     return chain.release();
@@ -580,6 +598,9 @@ keymaster_error_t TrustyKeymasterContext::SetAttestKey(keymaster_algorithm_t alg
     if (algorithm != KM_ALGORITHM_RSA && algorithm != KM_ALGORITHM_EC) {
         return KM_ERROR_UNSUPPORTED_ALGORITHM;
     }
+    if (key_size == 0) {
+        return KM_ERROR_INVALID_INPUT_LENGTH;
+    }
     bool exists;
     keymaster_error_t error = AttestationKeyExists(algorithm, &exists);
     if (error != KM_ERROR_OK) {
@@ -599,10 +620,13 @@ keymaster_error_t TrustyKeymasterContext::AppendAttestCertChain(keymaster_algori
     if (algorithm != KM_ALGORITHM_RSA && algorithm != KM_ALGORITHM_EC) {
         return KM_ERROR_UNSUPPORTED_ALGORITHM;
     }
-    uint32_t cert_chain_length;
+    if (cert_size == 0) {
+        return KM_ERROR_INVALID_INPUT_LENGTH;
+    }
+    uint32_t cert_chain_length = 0;
     keymaster_error_t error = ReadCertChainLength(algorithm, &cert_chain_length);
     if (error != KM_ERROR_OK) {
-        return error;
+        cert_chain_length = 0;
     }
     if (cert_chain_length >= kMaxCertChainLength) {
 #ifndef KEYMASTER_DEBUG
@@ -616,3 +640,4 @@ keymaster_error_t TrustyKeymasterContext::AppendAttestCertChain(keymaster_algori
 }
 
 }  // namespace keymaster
+

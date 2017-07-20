@@ -24,6 +24,7 @@ extern "C" {
 #include <lib/storage/storage.h>
 }
 
+#include "trusty_keymaster_context.h"
 #include "trusty_logger.h"
 #include <UniquePtr.h>
 
@@ -170,7 +171,6 @@ const char* GetAlgorithmStr(keymaster_algorithm_t algorithm) {
 keymaster_error_t WriteKeyToStorage(keymaster_algorithm_t algorithm, const uint8_t* key,
                                     uint32_t key_size) {
     UniquePtr<char[]> key_file(new char[kStorageIdLengthMax]);
-    uint64_t current_size;
 
     snprintf(key_file.get(), kStorageIdLengthMax, "%s.%s", kAttestKeyPrefix,
              GetAlgorithmStr(algorithm));
@@ -189,7 +189,7 @@ keymaster_error_t ReadKeyFromStorage(keymaster_algorithm_t algorithm, uint8_t** 
              GetAlgorithmStr(algorithm));
 
     uint64_t key_size_64;
-    if (!SecureStorageGetFileSize(key_file.get(), &key_size_64)) {
+    if (!SecureStorageGetFileSize(key_file.get(), &key_size_64) || key_size_64 == 0) {
         return KM_ERROR_UNKNOWN_ERROR;
     }
     *key_size = static_cast<uint32_t>(key_size_64);
@@ -230,7 +230,8 @@ keymaster_error_t ReadCertChainFromStorage(keymaster_algorithm_t algorithm,
     uint32_t cert_chain_length;
     uint64_t cert_size;
 
-    if (ReadCertChainLength(algorithm, &cert_chain_length) != KM_ERROR_OK) {
+    if (ReadCertChainLength(algorithm, &cert_chain_length) != KM_ERROR_OK ||
+        cert_chain_length == 0) {
         return KM_ERROR_UNKNOWN_ERROR;
     }
     cert_chain->entry_count = cert_chain_length;
@@ -244,7 +245,7 @@ keymaster_error_t ReadCertChainFromStorage(keymaster_algorithm_t algorithm,
     for (size_t i = 0; i < cert_chain_length; ++i) {
         snprintf(cert_file.get(), kStorageIdLengthMax, "%s.%s.%d", kAttestCertPrefix,
                  GetAlgorithmStr(algorithm), i);
-        if (!SecureStorageGetFileSize(cert_file.get(), &cert_size)) {
+        if (!SecureStorageGetFileSize(cert_file.get(), &cert_size) || cert_size == 0) {
             return KM_ERROR_UNKNOWN_ERROR;
         }
         UniquePtr<uint8_t[]> cert_data(new uint8_t[cert_size]);
@@ -279,10 +280,12 @@ keymaster_error_t ReadCertChainLength(keymaster_algorithm_t algorithm,
     snprintf(cert_chain_length_file.get(), kStorageIdLengthMax, "%s.%s.length", kAttestKeyPrefix,
              GetAlgorithmStr(algorithm));
     if (!SecureStorageRead(cert_chain_length_file.get(),
-                           reinterpret_cast<uint8_t*>(cert_chain_length), sizeof(uint32_t))) {
+                           reinterpret_cast<uint8_t*>(cert_chain_length), sizeof(uint32_t)) ||
+        *cert_chain_length > kMaxCertChainLength) {
         return KM_ERROR_UNKNOWN_ERROR;
     }
     return KM_ERROR_OK;
 }
 
 }  // namespace keymaster
+
