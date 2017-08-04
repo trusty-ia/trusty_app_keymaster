@@ -99,6 +99,10 @@ class TrustyKeymasterContext : public KeymasterContext {
     keymaster_error_t AppendAttestCertChain(keymaster_algorithm_t algorithm, const uint8_t* cert,
                                             uint32_t cert_size);
 
+    keymaster_error_t AtapGetCaRequest(const Buffer& operation_start, Buffer* ca_request);
+
+    keymaster_error_t AtapSetCaResponse(const Buffer& ca_response);
+
   private:
     bool SeedRngIfNeeded() const;
     bool ShouldReseedRng() const;

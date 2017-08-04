@@ -200,6 +200,8 @@ static long keymaster_dispatch_non_secure(keymaster_chan_ctx* ctx, keymaster_mes
         msg->cmd != KM_SET_BOOT_PARAMS &&
         msg->cmd != KM_SET_ATTESTATION_KEY &&
         msg->cmd != KM_APPEND_ATTESTATION_CERT_CHAIN &&
+        msg->cmd != KM_ATAP_GET_CA_REQUEST &&
+        msg->cmd != KM_ATAP_SET_CA_RESPONSE &&
         ((!device->ConfigureCalled() && msg->cmd != KM_CONFIGURE) ||
         (device->ConfigureCalled() && device->get_configure_error() != KM_ERROR_OK))) {
         return ERR_NOT_CONFIGURED;
@@ -298,6 +300,14 @@ static long keymaster_dispatch_non_secure(keymaster_chan_ctx* ctx, keymaster_mes
         LOG_D("Dispatching SET_ATTESTATION_CERT_CHAIN, size %d", payload_size);
         return do_dispatch(&TrustyKeymaster::AppendAttestationCertChain, msg, payload_size, out,
                            out_size);
+
+    case KM_ATAP_GET_CA_REQUEST:
+        LOG_D("Dispatching KM_ATAP_GET_CA_REQUEST, size %d", payload_size);
+        return do_dispatch(&TrustyKeymaster::AtapGetCaRequest, msg, payload_size, out, out_size);
+
+    case KM_ATAP_SET_CA_RESPONSE:
+        LOG_D("Dispatching KM_ATAP_SET_CA_RESPONSE, size %d", payload_size);
+        return do_dispatch(&TrustyKeymaster::AtapSetCaResponse, msg, payload_size, out, out_size);
 
     default:
         LOG_E("Cannot dispatch unknown command %d", msg->cmd);

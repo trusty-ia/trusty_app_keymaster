@@ -632,4 +632,15 @@ keymaster_error_t TrustyKeymasterContext::AppendAttestCertChain(keymaster_algori
     return WriteCertToStorage(algorithm, cert, cert_size, cert_chain_length);
 }
 
+keymaster_error_t TrustyKeymasterContext::AtapGetCaRequest(const Buffer& operation_start,
+                                                           Buffer* ca_request) {
+    // Not implemented.
+    return KM_ERROR_UNKNOWN_ERROR;
+}
+
+keymaster_error_t TrustyKeymasterContext::AtapSetCaResponse(const Buffer& ca_response) {
+    // Not implemented.
+    return KM_ERROR_UNKNOWN_ERROR;
+}
+
 }  // namespace keymaster

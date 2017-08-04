@@ -57,4 +57,18 @@ void TrustyKeymaster::AppendAttestationCertChain(const AppendAttestationCertChai
     response->error = context_->AppendAttestCertChain(request.algorithm, cert, cert_size);
 }
 
+void TrustyKeymaster::AtapGetCaRequest(const AtapGetCaRequestRequest& request,
+                                       AtapGetCaRequestResponse* response) {
+    if (response == nullptr)
+        return;
+    response->error = context_->AtapGetCaRequest(request.data, &response->data);
+}
+
+void TrustyKeymaster::AtapSetCaResponse(const AtapSetCaResponseRequest& request,
+                                        AtapSetCaResponseResponse* response) {
+    if (response == nullptr)
+        return;
+    response->error = context_->AtapSetCaResponse(request.data);
+}
+
 }  // namespace keymaster

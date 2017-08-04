@@ -32,7 +32,41 @@ enum TrustyKeymasterCommand {
 };
 
 /**
- * Generic struct for Keymaster responses which have no specialized response data
+ * Generic struct for Keymaster requests which hold a single raw buffer.
+ */
+struct RawBufferRequest : public KeymasterMessage {
+    explicit RawBufferRequest(int32_t ver = MAX_MESSAGE_VERSION) : KeymasterMessage(ver) {}
+
+    size_t SerializedSize() const override { return data.SerializedSize(); }
+    uint8_t* Serialize(uint8_t* buf, const uint8_t* end) const override {
+        return data.Serialize(buf, end);
+    }
+    bool Deserialize(const uint8_t** buf_ptr, const uint8_t* end) {
+        return data.Deserialize(buf_ptr, end);
+    }
+
+    Buffer data;
+};
+
+/**
+ * Generic struct for Keymaster responses which hold a single raw buffer.
+ */
+struct RawBufferResponse : public KeymasterResponse {
+    explicit RawBufferResponse(int32_t ver = MAX_MESSAGE_VERSION) : KeymasterResponse(ver) {}
+
+    size_t NonErrorSerializedSize() const override { return data.SerializedSize(); }
+    uint8_t* NonErrorSerialize(uint8_t* buf, const uint8_t* end) const override {
+        return data.Serialize(buf, end);
+    }
+    bool NonErrorDeserialize(const uint8_t** buf_ptr, const uint8_t* end) {
+        return data.Deserialize(buf_ptr, end);
+    }
+
+    Buffer data;
+};
+
+/**
+ * Generic struct for Keymaster responses which have no specialized response data.
  */
 struct NoResponse : public KeymasterResponse {
     explicit NoResponse(int32_t ver = MAX_MESSAGE_VERSION) : KeymasterResponse(ver) {}
@@ -95,8 +129,6 @@ struct SetAttestationKeyRequest : public KeymasterMessage {
 
 struct SetAttestationKeyResponse : public NoResponse {};
 
-// The bootloader should push certificates into Trusty, one certificate per request, starting
-// with the attestation certificate. Multiple AppendAttestationCertChain requests are expected.
 struct AppendAttestationCertChainRequest : public KeymasterMessage {
     explicit AppendAttestationCertChainRequest(int32_t ver = MAX_MESSAGE_VERSION)
         : KeymasterMessage(ver) {}
@@ -116,6 +148,15 @@ struct AppendAttestationCertChainRequest : public KeymasterMessage {
 };
 
 struct AppendAttestationCertChainResponse : public NoResponse {};
+
+/**
+ * For Android Things Attestation Provisioning (ATAP), the messages in the protocol are raw opaque
+ * messages for the purposes of this IPC call.
+ */
+struct AtapGetCaRequestRequest : public RawBufferResponse {};
+struct AtapGetCaRequestResponse : public RawBufferResponse {};
+struct AtapSetCaResponseRequest : public RawBufferResponse {};
+struct AtapSetCaResponseResponse : public NoResponse {};
 
 }  // namespace keymaster
 
