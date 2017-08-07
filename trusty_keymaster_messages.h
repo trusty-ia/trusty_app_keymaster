@@ -47,21 +47,24 @@ struct SetBootParamsRequest : public KeymasterMessage {
 
     size_t SerializedSize() const override {
         return (sizeof(os_version) + sizeof(os_patchlevel) + sizeof(device_locked) +
-                sizeof(verified_boot_state) + verified_boot_key.SerializedSize());
+                sizeof(verified_boot_state) + verified_boot_key.SerializedSize() +
+                verified_boot_hash.SerializedSize());
     }
     uint8_t* Serialize(uint8_t* buf, const uint8_t* end) const override {
         buf = append_uint32_to_buf(buf, end, os_version);
         buf = append_uint32_to_buf(buf, end, os_patchlevel);
         buf = append_uint32_to_buf(buf, end, device_locked);
         buf = append_uint32_to_buf(buf, end, verified_boot_state);
-        return verified_boot_key.Serialize(buf, end);
+        buf = verified_boot_key.Serialize(buf, end);
+        return verified_boot_hash.Serialize(buf, end);
     }
     bool Deserialize(const uint8_t** buf_ptr, const uint8_t* end) {
         return copy_uint32_from_buf(buf_ptr, end, &os_version) &&
                copy_uint32_from_buf(buf_ptr, end, &os_patchlevel) &&
                copy_uint32_from_buf(buf_ptr, end, &device_locked) &&
                copy_uint32_from_buf(buf_ptr, end, &verified_boot_state) &&
-               verified_boot_key.Deserialize(buf_ptr, end);
+               verified_boot_key.Deserialize(buf_ptr, end) &&
+               verified_boot_hash.Deserialize(buf_ptr, end);
     }
 
     uint32_t os_version;
@@ -69,6 +72,7 @@ struct SetBootParamsRequest : public KeymasterMessage {
     uint32_t device_locked;
     keymaster_verified_boot_t verified_boot_state;
     Buffer verified_boot_key;
+    Buffer verified_boot_hash;
 };
 
 struct SetBootParamsResponse : public NoResponse {};

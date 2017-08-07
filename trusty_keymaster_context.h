@@ -91,7 +91,7 @@ class TrustyKeymasterContext : public KeymasterContext {
     keymaster_error_t SetBootParams(uint32_t os_version, uint32_t os_patchlevel,
                                     const Buffer& verified_boot_key,
                                     keymaster_verified_boot_t verified_boot_state,
-                                    bool device_locked);
+                                    bool device_locked, const Buffer& verified_boot_hash);
 
     keymaster_error_t SetAttestKey(keymaster_algorithm_t algorithm, const uint8_t* key,
                                    uint32_t key_size);
@@ -142,6 +142,7 @@ class TrustyKeymasterContext : public KeymasterContext {
     Buffer verified_boot_key_;
     keymaster_verified_boot_t verified_boot_state_ = KM_VERIFIED_BOOT_UNVERIFIED;
     bool device_locked_ = false;
+    Buffer verified_boot_hash_;
 };
 
 }  // namespace keymaster

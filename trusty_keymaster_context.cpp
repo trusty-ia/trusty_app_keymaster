@@ -564,14 +564,17 @@ keymaster_cert_chain_t* TrustyKeymasterContext::AttestationChain(keymaster_algor
     return chain.release();
 }
 
-keymaster_error_t TrustyKeymasterContext::SetBootParams(
-    uint32_t os_version, uint32_t os_patchlevel, const Buffer& verified_boot_key,
-    keymaster_verified_boot_t verified_boot_state, bool device_locked) {
+keymaster_error_t
+TrustyKeymasterContext::SetBootParams(uint32_t os_version, uint32_t os_patchlevel,
+                                      const Buffer& verified_boot_key,
+                                      keymaster_verified_boot_t verified_boot_state,
+                                      bool device_locked, const Buffer& verified_boot_hash) {
     if (boot_params_set_)
         return KM_ERROR_ROOT_OF_TRUST_ALREADY_SET;
     boot_params_set_ = true;
     boot_os_version_ = os_version;
     boot_os_patchlevel_ = os_patchlevel;
+    verified_boot_hash_.Reinitialize(verified_boot_hash);
 
     // If no verified boot key hash is passed, then verified boot state is considered
     // unverified and unlocked.

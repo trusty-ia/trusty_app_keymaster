@@ -15,6 +15,7 @@
  */
 
 #include "trusty_keymaster.h"
+
 #include <err.h>
 
 namespace keymaster {
@@ -31,10 +32,9 @@ void TrustyKeymaster::SetBootParams(const SetBootParamsRequest& request,
     if (response == nullptr)
         return;
 
-    response->error = context_->SetBootParams(request.os_version, request.os_patchlevel,
-                                              request.verified_boot_key,
-                                              request.verified_boot_state,
-                                              request.device_locked);
+    response->error = context_->SetBootParams(
+        request.os_version, request.os_patchlevel, request.verified_boot_key,
+        request.verified_boot_state, request.device_locked, request.verified_boot_hash);
 }
 
 void TrustyKeymaster::SetAttestationKey(const SetAttestationKeyRequest& request,
