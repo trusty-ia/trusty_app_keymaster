@@ -311,6 +311,11 @@ static long keymaster_dispatch_non_secure(keymaster_chan_ctx* ctx, keymaster_mes
         return do_dispatch(&TrustyKeymaster::AppendAttestationCertChain, msg, payload_size, out,
                            out_size);
 
+    case KM_PROVISION_KEYBOX:
+        LOG_D("Dispatching KM_PROVISION_KEYBOX, size %d", payload_size);
+        return do_dispatch(&TrustyKeymaster::ProvsionAttesationKeybox, msg, payload_size, out,
+                           out_size);
+
     default:
         LOG_E("Cannot dispatch unknown command %d", msg->cmd);
         return ERR_NOT_IMPLEMENTED;

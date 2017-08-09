@@ -24,6 +24,8 @@
 #include <keymaster/keymaster_context.h>
 
 #include "trusty_keymaster_enforcement.h"
+#include "attest_keybox.h"
+#include "tinyxml2.h"
 
 namespace keymaster {
 
@@ -99,6 +101,8 @@ class TrustyKeymasterContext : public KeymasterContext {
     keymaster_error_t AppendAttestCertChain(keymaster_algorithm_t algorithm, const uint8_t* cert,
                                             uint32_t cert_size);
 
+    keymaster_error_t ProvisionAttestKeybox(const uint8_t* keybox, uint32_t keybox_size);
+
   private:
     bool SeedRngIfNeeded() const;
     bool ShouldReseedRng() const;
@@ -123,6 +127,9 @@ class TrustyKeymasterContext : public KeymasterContext {
                                                  const AuthorizationSet& hw_enforced,
                                                  const AuthorizationSet& sw_enforced,
                                                  KeymasterKeyBlob* blob) const;
+
+    keymaster_error_t ParseKeyboxToStorage(keymaster_algorithm_t algorithm,
+                                        XMLElement* xml_root);
 
     TrustyKeymasterEnforcement enforcement_policy_;
 

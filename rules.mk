@@ -52,6 +52,7 @@ MODULE_SRCS += \
 	$(KEYMASTER_ROOT)/symmetric_key.cpp \
 	$(LOCAL_DIR)/manifest.c \
 	$(LOCAL_DIR)/test_attestation_keys.cpp \
+	$(LOCAL_DIR)/attest_keybox.cpp \
 	$(LOCAL_DIR)/trusty_keymaster.cpp \
 	$(LOCAL_DIR)/trusty_keymaster_context.cpp \
 	$(LOCAL_DIR)/trusty_keymaster_enforcement.cpp \
@@ -74,7 +75,8 @@ MODULE_DEPS += \
 	lib/libstdc++-trusty \
 	lib/rng \
 	lib/storage \
-	lib/hwkey
+	lib/hwkey \
+	lib/tinyxml2
 
 include $(LOCAL_DIR)/$(IPC)/rules.mk
 

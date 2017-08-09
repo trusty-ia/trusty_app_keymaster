@@ -57,4 +57,14 @@ void TrustyKeymaster::AppendAttestationCertChain(const AppendAttestationCertChai
     response->error = context_->AppendAttestCertChain(request.algorithm, cert, cert_size);
 }
 
+void TrustyKeymaster::ProvsionAttesationKeybox(const ProvsionAttesationKeyboxRequest& request,
+                                                 ProvsionAttesationKeyboxResponse* response) {
+    if (response == nullptr)
+        return;
+    size_t keybox_size = request.keybox_data.buffer_size();
+    const uint8_t* keybox = request.keybox_data.begin();
+
+    response->error = context_->ProvisionAttestKeybox(keybox, keybox_size);
+}
+
 }  // namespace keymaster
