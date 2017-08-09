@@ -38,6 +38,8 @@ class TrustyKeymaster : public AndroidKeymaster {
                 SetAttestationKeyResponse* response);
     void AppendAttestationCertChain(const AppendAttestationCertChainRequest& request,
                 AppendAttestationCertChainResponse* response);
+    void ProvsionAttesationKeybox(const ProvsionAttesationKeyboxRequest& request,
+                ProvsionAttesationKeyboxResponse* response);
 
     bool ConfigureCalled() { return configure_error_ != KM_ERROR_KEYMASTER_NOT_CONFIGURED; }
     keymaster_error_t get_configure_error() { return configure_error_; }

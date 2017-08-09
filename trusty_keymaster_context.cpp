@@ -522,7 +522,7 @@ EVP_PKEY* TrustyKeymasterContext::AttestationKey(keymaster_algorithm_t algorithm
         *error = KM_ERROR_UNSUPPORTED_ALGORITHM;
         return nullptr;
     }
-#if 0  //TODO: there's some issue obout this API, need the debug later
+
     *error = ReadKeyFromStorage(algorithm, &key, &key_size);
     if (*error == KM_ERROR_OK) {
         key_deleter.reset(key);
@@ -530,9 +530,6 @@ EVP_PKEY* TrustyKeymasterContext::AttestationKey(keymaster_algorithm_t algorithm
         LOG_E("Failed to read attestation key from RPMB, falling back to test key", 0);
         *error = GetSoftwareAttestationKey(algorithm, &key, &key_size);
     }
-#endif
-    LOG_E("Failed to read attestation key from RPMB, falling back to test key", 0);
-    *error = GetSoftwareAttestationKey(algorithm, &key, &key_size);
 
     if (*error != KM_ERROR_OK)
         return nullptr;
@@ -559,15 +556,11 @@ keymaster_cert_chain_t* TrustyKeymasterContext::AttestationChain(keymaster_algor
     }
     memset(chain.get(), 0, sizeof(keymaster_cert_chain_t));
 
-#if 0  //TODO: there's some issue obout this API, need the debug later
     *error = ReadCertChainFromStorage(algorithm, chain.get());
     if (*error != KM_ERROR_OK) {
         LOG_E("Failed to read attestation chain from RPMB, falling back to test chain", 0);
         *error = GetSoftwareAttestationChain(algorithm, chain.get());
     }
-#endif
-    LOG_E("Failed to read attestation chain from RPMB, falling back to test chain", 0);
-    *error = GetSoftwareAttestationChain(algorithm, chain.get());
 
     if (*error != KM_ERROR_OK)
         return nullptr;
@@ -601,6 +594,9 @@ keymaster_error_t TrustyKeymasterContext::SetAttestKey(keymaster_algorithm_t alg
     if (key_size == 0) {
         return KM_ERROR_INVALID_INPUT_LENGTH;
     }
+    if (!key) {
+        return KM_ERROR_INVALID_ARGUMENT;
+    }
     bool exists;
     keymaster_error_t error = AttestationKeyExists(algorithm, &exists);
     if (error != KM_ERROR_OK) {
@@ -608,6 +604,7 @@ keymaster_error_t TrustyKeymasterContext::SetAttestKey(keymaster_algorithm_t alg
     }
 #ifndef KEYMASTER_DEBUG
     if (exists) {
+        //TODO:  need to add a error code: KM_ERROR_ATTESTKEY_ALREADY_SET, and check it in the bootloader
         return KM_ERROR_UNKNOWN_ERROR;
     }
 #endif
@@ -623,6 +620,9 @@ keymaster_error_t TrustyKeymasterContext::AppendAttestCertChain(keymaster_algori
     if (cert_size == 0) {
         return KM_ERROR_INVALID_INPUT_LENGTH;
     }
+    if (!cert) {
+        return KM_ERROR_INVALID_ARGUMENT;
+    }
     uint32_t cert_chain_length = 0;
     keymaster_error_t error = ReadCertChainLength(algorithm, &cert_chain_length);
     if (error != KM_ERROR_OK) {
@@ -637,6 +637,86 @@ keymaster_error_t TrustyKeymasterContext::AppendAttestCertChain(keymaster_algori
 #endif
     }
     return WriteCertToStorage(algorithm, cert, cert_size, cert_chain_length);
+}
+
+keymaster_error_t TrustyKeymasterContext::ParseKeyboxToStorage(keymaster_algorithm_t algorithm,
+                                        XMLElement* xml_root) {
+    keymaster_error_t error = KM_ERROR_OK;
+
+    /* provision the private key to secure storage */
+    uint8_t* attest_key = NULL;
+    uint32_t attest_keysize = 0;
+    error =  get_prikey_from_keybox(xml_root, algorithm, &attest_key, &attest_keysize);
+    if (error != KM_ERROR_OK || !attest_key ||!attest_keysize) {
+       LOG_E("Error: [%d] failed to get the prikey(algo:%d) from keybox", error, algorithm);
+       return KM_ERROR_UNKNOWN_ERROR;
+    }
+    error = SetAttestKey(algorithm, attest_key, attest_keysize);
+    if (error != KM_ERROR_OK) {
+        LOG_E("Error: (%d) failed to write pri_key into RPMB with algo(%d)", error, algorithm);
+        return KM_ERROR_UNKNOWN_ERROR;
+    }
+
+    /* provision the cert chain to secure storage */
+    uint32_t cert_chain_len = 0;
+    uint32_t index = 0;
+    error = get_cert_chain_len_from_keybox(xml_root, algorithm, &cert_chain_len);
+    if (error != KM_ERROR_OK) {
+        LOG_E("Error: (%d) failed to get the cert_chain_len from keybox", error);
+        return KM_ERROR_UNKNOWN_ERROR;
+    }
+    /* save the certs one-by-one to securestorage */
+    for (index = 0; index<cert_chain_len; index++) {
+        uint8_t* cert;
+        uint32_t cert_size = 0;
+        error = get_cert_from_keybox(xml_root, algorithm, index, &cert, &cert_size);
+        if (error != KM_ERROR_OK || !cert ||!cert_size) {
+            LOG_E("Error: (%d) failed to get the cert(%d) from keybox with algo(%d)", error, index, algorithm);
+            return KM_ERROR_UNKNOWN_ERROR;
+        }
+
+        error = AppendAttestCertChain(algorithm, cert, cert_size);
+        if (error != KM_ERROR_OK) {
+            LOG_E("Error: (%d) failed to append the cert(%d) into RPMB with algo(%d)", error, index, algorithm);
+            return KM_ERROR_UNKNOWN_ERROR;
+        }
+    }
+
+    return KM_ERROR_OK;
+}
+
+keymaster_error_t TrustyKeymasterContext:: ProvisionAttestKeybox(const uint8_t* keybox,
+                                        uint32_t keybox_size) {
+    keymaster_error_t error = KM_ERROR_OK;
+
+    if (keybox == NULL) {
+        error = RetrieveKeybox((uint8_t**)&keybox, &keybox_size);
+        if(error != KM_ERROR_OK ||!keybox || !keybox_size) {
+            LOG_E("failed(%d) to RetrieveKeybox", error);
+            return KM_ERROR_UNKNOWN_ERROR;
+        }
+    }
+
+    XMLElement* xml_root = NULL;
+    error = keybox_xml_initialize(keybox, &xml_root);
+    if (error != KM_ERROR_OK || !xml_root) {
+        LOG_E("Error: (%d) failed to initialize the keybox", error);
+        return KM_ERROR_UNKNOWN_ERROR;
+    }
+
+    error = ParseKeyboxToStorage(KM_ALGORITHM_RSA, xml_root);
+    if(error != KM_ERROR_OK) {
+        LOG_E("ParseKeyboxToStorage failed(%d) wih KM_ALGORITHM_RSA", error);
+        return KM_ERROR_UNKNOWN_ERROR;
+    }
+
+    error = ParseKeyboxToStorage(KM_ALGORITHM_EC, xml_root);
+    if(error != KM_ERROR_OK) {
+        LOG_E("ParseKeyboxToStorage failed(%d) with KM_ALGORITHM_EC", error);
+        return KM_ERROR_UNKNOWN_ERROR;
+    }
+
+    return KM_ERROR_OK;
 }
 
 }  // namespace keymaster

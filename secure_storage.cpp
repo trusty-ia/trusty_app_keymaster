@@ -34,11 +34,11 @@ namespace {
 
 // Name of the attestation key file is kAttestKeyPrefix.%algorithm, where
 // algorithm is either "ec" or "rsa".
-const char* kAttestKeyPrefix = "AttestKey.";
+const char* kAttestKeyPrefix = "AttestKey";
 
 // Name of the attestation certificate file is kAttestCertPrefix.%algorithm.%index,
 // where index is the index within the certificate chain.
-const char* kAttestCertPrefix = "AttestCert.";
+const char* kAttestCertPrefix = "AttestCert";
 
 // Maximum file name size.
 static const int kStorageIdLengthMax = 64;
@@ -174,6 +174,7 @@ keymaster_error_t WriteKeyToStorage(keymaster_algorithm_t algorithm, const uint8
 
     snprintf(key_file.get(), kStorageIdLengthMax, "%s.%s", kAttestKeyPrefix,
              GetAlgorithmStr(algorithm));
+
     if (!SecureStorageDeleteFile(key_file.get()) ||
         !SecureStorageWrite(key_file.get(), key, key_size)) {
         return KM_ERROR_UNKNOWN_ERROR;
@@ -188,7 +189,7 @@ keymaster_error_t ReadKeyFromStorage(keymaster_algorithm_t algorithm, uint8_t** 
     snprintf(key_file.get(), kStorageIdLengthMax, "%s.%s", kAttestKeyPrefix,
              GetAlgorithmStr(algorithm));
 
-    uint64_t key_size_64;
+    uint64_t key_size_64 = 0;
     if (!SecureStorageGetFileSize(key_file.get(), &key_size_64) || key_size_64 == 0) {
         return KM_ERROR_UNKNOWN_ERROR;
     }
