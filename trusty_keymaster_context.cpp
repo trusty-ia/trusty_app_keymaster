@@ -473,12 +473,13 @@ keymaster_error_t TrustyKeymasterContext::SetSystemVersion(uint32_t os_version,
     }
 #else
     Buffer fake_root_of_trust("000111222333444555666777888999000", 32);
+    Buffer verified_boot_hash_none;
     if (!boot_params_set_) {
         /* Sets bootloader parameters to what is expected on a 'good' device, will pass
          * attestation CTS tests. FOR DEBUGGING ONLY.
          */
         SetBootParams(os_version, os_patchlevel, fake_root_of_trust, KM_VERIFIED_BOOT_VERIFIED,
-                      true);
+                      true, verified_boot_hash_none);
     }
 #endif
 
