@@ -153,9 +153,9 @@ struct AppendAttestationCertChainResponse : public NoResponse {};
  * For Android Things Attestation Provisioning (ATAP), the messages in the protocol are raw opaque
  * messages for the purposes of this IPC call.
  */
-struct AtapGetCaRequestRequest : public RawBufferResponse {};
+struct AtapGetCaRequestRequest : public RawBufferRequest {};
 struct AtapGetCaRequestResponse : public RawBufferResponse {};
-struct AtapSetCaResponseRequest : public RawBufferResponse {};
+struct AtapSetCaResponseRequest : public RawBufferRequest {};
 struct AtapSetCaResponseResponse : public NoResponse {};
 
 }  // namespace keymaster

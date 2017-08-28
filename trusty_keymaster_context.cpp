@@ -26,6 +26,9 @@ extern "C" {
 #include <keymaster/ec_key_factory.h>
 #include <keymaster/logger.h>
 #include <keymaster/rsa_key_factory.h>
+#ifndef DISABLE_ATAP_SUPPORT
+#include <libatap/libatap.h>
+#endif
 
 #include "aes_key.h"
 #include "auth_encrypted_key_blob.h"
@@ -205,6 +208,8 @@ keymaster_error_t TrustyKeymasterContext::SetAuthorizations(const AuthorizationS
         case KM_TAG_EXPORTABLE:
 
             sw_enforced->push_back(entry);
+            break;
+        default:
             break;
         }
     }
@@ -509,14 +514,17 @@ EVP_PKEY* TrustyKeymasterContext::AttestationKey(keymaster_algorithm_t algorithm
     size_t key_size = 0;
     int evp_key_type;
     UniquePtr<uint8_t[]> key_deleter;
+    AttestationKeySlot key_slot;
 
     switch (algorithm) {
     case KM_ALGORITHM_RSA:
         evp_key_type = EVP_PKEY_RSA;
+        key_slot = AttestationKeySlot::kRsa;
         break;
 
     case KM_ALGORITHM_EC:
         evp_key_type = EVP_PKEY_EC;
+        key_slot = AttestationKeySlot::kEcdsa;
         break;
 
     default:
@@ -524,7 +532,7 @@ EVP_PKEY* TrustyKeymasterContext::AttestationKey(keymaster_algorithm_t algorithm
         return nullptr;
     }
 
-    *error = ReadKeyFromStorage(algorithm, &key, &key_size);
+    *error = ReadKeyFromStorage(key_slot, &key, &key_size);
     if (*error == KM_ERROR_OK) {
         key_deleter.reset(key);
     } else {
@@ -549,13 +557,21 @@ keymaster_cert_chain_t* TrustyKeymasterContext::AttestationChain(keymaster_algor
         *error = KM_ERROR_MEMORY_ALLOCATION_FAILED;
         return nullptr;
     }
-    if (algorithm != KM_ALGORITHM_RSA && algorithm != KM_ALGORITHM_EC) {
+    AttestationKeySlot key_slot;
+    switch (algorithm) {
+    case KM_ALGORITHM_RSA:
+        key_slot = AttestationKeySlot::kRsa;
+        break;
+    case KM_ALGORITHM_EC:
+        key_slot = AttestationKeySlot::kEcdsa;
+        break;
+    default:
         *error = KM_ERROR_UNSUPPORTED_ALGORITHM;
         return nullptr;
     }
     memset(chain.get(), 0, sizeof(keymaster_cert_chain_t));
 
-    *error = ReadCertChainFromStorage(algorithm, chain.get());
+    *error = ReadCertChainFromStorage(key_slot, chain.get());
     if (*error != KM_ERROR_OK) {
         LOG_I("Failed to read attestation chain from RPMB, falling back to test chain", 0);
         *error = GetSoftwareAttestationChain(algorithm, chain.get());
@@ -589,14 +605,22 @@ TrustyKeymasterContext::SetBootParams(uint32_t os_version, uint32_t os_patchleve
 
 keymaster_error_t TrustyKeymasterContext::SetAttestKey(keymaster_algorithm_t algorithm,
                                                        const uint8_t* key, uint32_t key_size) {
-    if (algorithm != KM_ALGORITHM_RSA && algorithm != KM_ALGORITHM_EC) {
+    AttestationKeySlot key_slot;
+    switch (algorithm) {
+    case KM_ALGORITHM_RSA:
+        key_slot = AttestationKeySlot::kRsa;
+        break;
+    case KM_ALGORITHM_EC:
+        key_slot = AttestationKeySlot::kEcdsa;
+        break;
+    default:
         return KM_ERROR_UNSUPPORTED_ALGORITHM;
     }
     if (key_size == 0) {
         return KM_ERROR_INVALID_INPUT_LENGTH;
     }
     bool exists;
-    keymaster_error_t error = AttestationKeyExists(algorithm, &exists);
+    keymaster_error_t error = AttestationKeyExists(key_slot, &exists);
     if (error != KM_ERROR_OK) {
         return error;
     }
@@ -605,20 +629,28 @@ keymaster_error_t TrustyKeymasterContext::SetAttestKey(keymaster_algorithm_t alg
         return KM_ERROR_UNKNOWN_ERROR;
     }
 #endif
-    return WriteKeyToStorage(algorithm, key, key_size);
+    return WriteKeyToStorage(key_slot, key, key_size);
 }
 
 keymaster_error_t TrustyKeymasterContext::AppendAttestCertChain(keymaster_algorithm_t algorithm,
                                                                 const uint8_t* cert,
                                                                 uint32_t cert_size) {
-    if (algorithm != KM_ALGORITHM_RSA && algorithm != KM_ALGORITHM_EC) {
+    AttestationKeySlot key_slot;
+    switch (algorithm) {
+    case KM_ALGORITHM_RSA:
+        key_slot = AttestationKeySlot::kRsa;
+        break;
+    case KM_ALGORITHM_EC:
+        key_slot = AttestationKeySlot::kEcdsa;
+        break;
+    default:
         return KM_ERROR_UNSUPPORTED_ALGORITHM;
     }
     if (cert_size == 0) {
         return KM_ERROR_INVALID_INPUT_LENGTH;
     }
     uint32_t cert_chain_length;
-    keymaster_error_t error = ReadCertChainLength(algorithm, &cert_chain_length);
+    keymaster_error_t error = ReadCertChainLength(key_slot, &cert_chain_length);
     if (error != KM_ERROR_OK) {
         cert_chain_length = 0;
     }
@@ -630,18 +662,44 @@ keymaster_error_t TrustyKeymasterContext::AppendAttestCertChain(keymaster_algori
         cert_chain_length = 0;
 #endif
     }
-    return WriteCertToStorage(algorithm, cert, cert_size, cert_chain_length);
+    return WriteCertToStorage(key_slot, cert, cert_size, cert_chain_length);
 }
 
 keymaster_error_t TrustyKeymasterContext::AtapGetCaRequest(const Buffer& operation_start,
                                                            Buffer* ca_request) {
+#ifdef DISABLE_ATAP_SUPPORT
     // Not implemented.
     return KM_ERROR_UNKNOWN_ERROR;
+#else
+    uint8_t* output;
+    uint32_t output_size;
+    AtapResult result =
+        atap_get_ca_request(atap_ops_provider_.atap_ops(), operation_start.begin(),
+                            operation_start.available_read(), &output, &output_size);
+    if (result != ATAP_RESULT_OK) {
+        return KM_ERROR_UNKNOWN_ERROR;
+    }
+    if (!ca_request->Reinitialize(output, output_size)) {
+        atap_free(output);
+        return KM_ERROR_MEMORY_ALLOCATION_FAILED;
+    }
+    atap_free(output);
+    return KM_ERROR_OK;
+#endif
 }
 
 keymaster_error_t TrustyKeymasterContext::AtapSetCaResponse(const Buffer& ca_response) {
+#ifdef DISABLE_ATAP_SUPPORT
     // Not implemented.
     return KM_ERROR_UNKNOWN_ERROR;
+#else
+    AtapResult result = atap_set_ca_response(atap_ops_provider_.atap_ops(), ca_response.begin(),
+                                             ca_response.available_read());
+    if (result != ATAP_RESULT_OK) {
+        return KM_ERROR_UNKNOWN_ERROR;
+    }
+    return KM_ERROR_OK;
+#endif
 }
 
 }  // namespace keymaster

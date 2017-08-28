@@ -155,12 +155,26 @@ bool SecureStorageDeleteFile(const char* filename) {
     return true;
 }
 
-const char* GetAlgorithmStr(keymaster_algorithm_t algorithm) {
-    switch (algorithm) {
-    case KM_ALGORITHM_RSA:
+const char* GetKeySlotStr(AttestationKeySlot key_slot) {
+    switch (key_slot) {
+    case AttestationKeySlot::kRsa:
         return "rsa";
-    case KM_ALGORITHM_EC:
+    case AttestationKeySlot::kEcdsa:
         return "ec";
+    case AttestationKeySlot::kEddsa:
+        return "ed";
+    case AttestationKeySlot::kEpid:
+        return "epid";
+    case AttestationKeySlot::kClaimable0:
+        return "c0";
+    case AttestationKeySlot::kSomRsa:
+        return "s_rsa";
+    case AttestationKeySlot::kSomEcdsa:
+        return "s_ec";
+    case AttestationKeySlot::kSomEddsa:
+        return "s_ed";
+    case AttestationKeySlot::kSomEpid:
+        return "s_epid";
     default:
         return "";
     }
@@ -168,12 +182,12 @@ const char* GetAlgorithmStr(keymaster_algorithm_t algorithm) {
 
 }  //  unnamed namespace
 
-keymaster_error_t WriteKeyToStorage(keymaster_algorithm_t algorithm, const uint8_t* key,
+keymaster_error_t WriteKeyToStorage(AttestationKeySlot key_slot, const uint8_t* key,
                                     uint32_t key_size) {
     UniquePtr<char[]> key_file(new char[kStorageIdLengthMax]);
 
     snprintf(key_file.get(), kStorageIdLengthMax, "%s.%s", kAttestKeyPrefix,
-             GetAlgorithmStr(algorithm));
+             GetKeySlotStr(key_slot));
     if (!SecureStorageDeleteFile(key_file.get()) ||
         !SecureStorageWrite(key_file.get(), key, key_size)) {
         return KM_ERROR_UNKNOWN_ERROR;
@@ -181,12 +195,12 @@ keymaster_error_t WriteKeyToStorage(keymaster_algorithm_t algorithm, const uint8
     return KM_ERROR_OK;
 }
 
-keymaster_error_t ReadKeyFromStorage(keymaster_algorithm_t algorithm, uint8_t** key,
+keymaster_error_t ReadKeyFromStorage(AttestationKeySlot key_slot, uint8_t** key,
                                      uint32_t* key_size) {
     UniquePtr<char[]> key_file(new char[kStorageIdLengthMax]);
 
     snprintf(key_file.get(), kStorageIdLengthMax, "%s.%s", kAttestKeyPrefix,
-             GetAlgorithmStr(algorithm));
+             GetKeySlotStr(key_slot));
 
     uint64_t key_size_64;
     if (!SecureStorageGetFileSize(key_file.get(), &key_size_64) || key_size_64 == 0) {
@@ -203,16 +217,16 @@ keymaster_error_t ReadKeyFromStorage(keymaster_algorithm_t algorithm, uint8_t** 
     return KM_ERROR_OK;
 }
 
-keymaster_error_t WriteCertToStorage(keymaster_algorithm_t algorithm, const uint8_t* cert,
+keymaster_error_t WriteCertToStorage(AttestationKeySlot key_slot, const uint8_t* cert,
                                      uint32_t cert_size, uint32_t index) {
     UniquePtr<char[]> cert_file(new char[kStorageIdLengthMax]);
     UniquePtr<char[]> cert_chain_length_file(new char[kStorageIdLengthMax]);
     uint32_t cert_chain_length = index + 1;
 
     snprintf(cert_file.get(), kStorageIdLengthMax, "%s.%s.%d", kAttestCertPrefix,
-             GetAlgorithmStr(algorithm), index);
+             GetKeySlotStr(key_slot), index);
     snprintf(cert_chain_length_file.get(), kStorageIdLengthMax, "%s.%s.length", kAttestKeyPrefix,
-             GetAlgorithmStr(algorithm));
+             GetKeySlotStr(key_slot));
 
     if (!SecureStorageDeleteFile(cert_file.get()) ||
         !SecureStorageWrite(cert_file.get(), cert, cert_size) ||
@@ -224,13 +238,13 @@ keymaster_error_t WriteCertToStorage(keymaster_algorithm_t algorithm, const uint
     return KM_ERROR_OK;
 }
 
-keymaster_error_t ReadCertChainFromStorage(keymaster_algorithm_t algorithm,
+keymaster_error_t ReadCertChainFromStorage(AttestationKeySlot key_slot,
                                            keymaster_cert_chain_t* cert_chain) {
     UniquePtr<char[]> cert_file(new char[kStorageIdLengthMax]);
     uint32_t cert_chain_length;
     uint64_t cert_size;
 
-    if (ReadCertChainLength(algorithm, &cert_chain_length) != KM_ERROR_OK ||
+    if (ReadCertChainLength(key_slot, &cert_chain_length) != KM_ERROR_OK ||
         cert_chain_length == 0) {
         return KM_ERROR_UNKNOWN_ERROR;
     }
@@ -244,7 +258,7 @@ keymaster_error_t ReadCertChainFromStorage(keymaster_algorithm_t algorithm,
     // Read |cert_chain_length| certs from storage
     for (size_t i = 0; i < cert_chain_length; ++i) {
         snprintf(cert_file.get(), kStorageIdLengthMax, "%s.%s.%d", kAttestCertPrefix,
-                 GetAlgorithmStr(algorithm), i);
+                 GetKeySlotStr(key_slot), i);
         if (!SecureStorageGetFileSize(cert_file.get(), &cert_size) || cert_size == 0) {
             return KM_ERROR_UNKNOWN_ERROR;
         }
@@ -261,11 +275,11 @@ keymaster_error_t ReadCertChainFromStorage(keymaster_algorithm_t algorithm,
     return KM_ERROR_OK;
 }
 
-keymaster_error_t AttestationKeyExists(keymaster_algorithm_t algorithm, bool* exists) {
+keymaster_error_t AttestationKeyExists(AttestationKeySlot key_slot, bool* exists) {
     UniquePtr<char[]> key_file(new char[kStorageIdLengthMax]);
 
     snprintf(key_file.get(), kStorageIdLengthMax, "%s.%s", kAttestKeyPrefix,
-             GetAlgorithmStr(algorithm));
+             GetKeySlotStr(key_slot));
     uint64_t size;
     if (!SecureStorageGetFileSize(key_file.get(), &size)) {
         return KM_ERROR_UNKNOWN_ERROR;
@@ -274,11 +288,10 @@ keymaster_error_t AttestationKeyExists(keymaster_algorithm_t algorithm, bool* ex
     return KM_ERROR_OK;
 }
 
-keymaster_error_t ReadCertChainLength(keymaster_algorithm_t algorithm,
-                                      uint32_t* cert_chain_length) {
+keymaster_error_t ReadCertChainLength(AttestationKeySlot key_slot, uint32_t* cert_chain_length) {
     UniquePtr<char[]> cert_chain_length_file(new char[kStorageIdLengthMax]);
     snprintf(cert_chain_length_file.get(), kStorageIdLengthMax, "%s.%s.length", kAttestKeyPrefix,
-             GetAlgorithmStr(algorithm));
+             GetKeySlotStr(key_slot));
     if (!SecureStorageRead(cert_chain_length_file.get(),
                            reinterpret_cast<uint8_t*>(cert_chain_length), sizeof(uint32_t)) ||
         *cert_chain_length > kMaxCertChainLength) {

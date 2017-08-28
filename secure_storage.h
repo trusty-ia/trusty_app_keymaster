@@ -23,47 +23,64 @@ extern "C" {
 
 namespace keymaster {
 
+// RSA and ECDSA are set to be the same as keymaster_algorithm_t.
+enum class AttestationKeySlot {
+    kInvalid = 0,
+    kRsa = 1,
+    kEcdsa = 3,
+    kEddsa = 4,
+    kEpid = 5,
+    // 'Claimable slots are for use with the claim_key HAL method.
+    kClaimable0 = 128,
+    // 'Som' slots are for Android Things SoM keys. These are generic, that is
+    // they are not associated with a particular model or product.
+    kSomRsa = 257,
+    kSomEcdsa = 259,
+    kSomEddsa = 260,
+    kSomEpid = 261,
+};
+
 /**
  * These functions implement key and certificate chain storage on top Trusty's
  * secure storage service. All data is stored in the RPMB filesystem.
  */
 
 /**
- * Writes |key_size| bytes at |key| to key file associated with |algorithm|.
+ * Writes |key_size| bytes at |key| to key file associated with |key_slot|.
  */
-keymaster_error_t WriteKeyToStorage(keymaster_algorithm_t algorithm, const uint8_t* key,
-                                    uint32_t key_size);
+keymaster_error_t
+WriteKeyToStorage(AttestationKeySlot key_slot, const uint8_t* key, uint32_t key_size);
 
 /**
- * Reads key associated with |algorithm|. Stores bytes read in |key_size| and allocates
+ * Reads key associated with |key_slot|. Stores bytes read in |key_size| and allocates
  * memory to |key| containing read data. Caller takes ownership of |key|.
  */
-keymaster_error_t ReadKeyFromStorage(keymaster_algorithm_t algorithm, uint8_t** key,
+keymaster_error_t ReadKeyFromStorage(AttestationKeySlot key_slot, uint8_t** key,
                                      uint32_t* key_size);
 
 /**
- * Writes |cert_size| bytes at |cert| to cert file associated with |algorithm| and |index|.
+ * Writes |cert_size| bytes at |cert| to cert file associated with |key_slot| and |index|.
  */
-keymaster_error_t WriteCertToStorage(keymaster_algorithm_t algorithm, const uint8_t* cert,
+keymaster_error_t WriteCertToStorage(AttestationKeySlot key_slot, const uint8_t* cert,
                                      uint32_t cert_size, uint32_t index);
 
 /**
- * Reads cert chain associated with |algorithm|. Stores certificate chain in |cert_chain|
+ * Reads cert chain associated with |key_slot|. Stores certificate chain in |cert_chain|
  * and caller takes ownership of all allocated memory.
  */
-keymaster_error_t ReadCertChainFromStorage(keymaster_algorithm_t algorithm,
+keymaster_error_t ReadCertChainFromStorage(AttestationKeySlot key_slot,
                                            keymaster_cert_chain_t* cert_chain);
 
 /**
- * Checks if |algorithm| attestation key exists in RPMB. On success, writes to |exists|.
+ * Checks if |key_slot| attestation key exists in RPMB. On success, writes to |exists|.
  */
-keymaster_error_t AttestationKeyExists(keymaster_algorithm_t algorithm, bool* exists);
+keymaster_error_t AttestationKeyExists(AttestationKeySlot key_slot, bool* exists);
 
 /**
- * Reads the current length of the stored |algorithm| attestation certificate chain. On
+ * Reads the current length of the stored |key_slot| attestation certificate chain. On
  * success, writes the length to |cert_chain_length|.
  */
-keymaster_error_t ReadCertChainLength(keymaster_algorithm_t algorithm, uint32_t* cert_chain_length);
+keymaster_error_t ReadCertChainLength(AttestationKeySlot key_slot, uint32_t* cert_chain_length);
 
 }  // namespace keymaster
 

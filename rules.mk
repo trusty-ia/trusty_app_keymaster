@@ -66,8 +66,6 @@ MODULE_CPPFLAGS := -std=c++11 -fno-short-enums
 
 MODULE_COMPILEFLAGS := -U__ANDROID__
 
-IPC := ipc
-
 MODULE_DEPS += \
 	app/trusty \
 	lib/libc-trusty \
@@ -77,6 +75,7 @@ MODULE_DEPS += \
 	lib/storage \
 	openssl
 
-include $(LOCAL_DIR)/$(IPC)/rules.mk
+include $(LOCAL_DIR)/atap/rules.mk
+include $(LOCAL_DIR)/ipc/rules.mk
 
 include make/module.mk

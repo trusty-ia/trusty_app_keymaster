@@ -24,6 +24,10 @@
 #include <keymaster/keymaster_context.h>
 
 #include "trusty_keymaster_enforcement.h"
+#ifndef DISABLE_ATAP_SUPPORT
+#include "atap/trusty_atap_ops.h"
+#include "ops/atap_ops_provider.h"
+#endif
 
 namespace keymaster {
 
@@ -147,6 +151,10 @@ class TrustyKeymasterContext : public KeymasterContext {
     keymaster_verified_boot_t verified_boot_state_ = KM_VERIFIED_BOOT_UNVERIFIED;
     bool device_locked_ = false;
     Buffer verified_boot_hash_;
+#ifndef DISABLE_ATAP_SUPPORT
+    TrustyAtapOps atap_ops_;
+    atap::AtapOpsProvider atap_ops_provider_ {&atap_ops_};
+#endif
 };
 
 }  // namespace keymaster
