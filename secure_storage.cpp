@@ -40,6 +40,8 @@ const char* kAttestKeyPrefix = "AttestKey.";
 // where index is the index within the certificate chain.
 const char* kAttestCertPrefix = "AttestCert.";
 
+const char* kAttestUuidFileName = "AttestUuid";
+
 // Maximum file name size.
 static const int kStorageIdLengthMax = 64;
 
@@ -295,6 +297,28 @@ keymaster_error_t ReadCertChainLength(AttestationKeySlot key_slot, uint32_t* cer
     if (!SecureStorageRead(cert_chain_length_file.get(),
                            reinterpret_cast<uint8_t*>(cert_chain_length), sizeof(uint32_t)) ||
         *cert_chain_length > kMaxCertChainLength) {
+        return KM_ERROR_UNKNOWN_ERROR;
+    }
+    return KM_ERROR_OK;
+}
+
+keymaster_error_t ReadAttestationUuid(uint8_t attestation_uuid[kAttestationUuidSize]) {
+    uint64_t size;
+    if (!SecureStorageGetFileSize(kAttestUuidFileName, &size)) {
+        return KM_ERROR_UNKNOWN_ERROR;
+    }
+    if (size < kAttestationUuidSize) {
+        memset(attestation_uuid, '0', kAttestationUuidSize);
+        return KM_ERROR_OK;
+    }
+    if (!SecureStorageRead(kAttestUuidFileName, attestation_uuid, kAttestationUuidSize)) {
+        return KM_ERROR_UNKNOWN_ERROR;
+    }
+    return KM_ERROR_OK;
+}
+
+keymaster_error_t WriteAttestationUuid(const uint8_t attestation_uuid[kAttestationUuidSize]) {
+    if (!SecureStorageWrite(kAttestUuidFileName, attestation_uuid, kAttestationUuidSize)) {
         return KM_ERROR_UNKNOWN_ERROR;
     }
     return KM_ERROR_OK;

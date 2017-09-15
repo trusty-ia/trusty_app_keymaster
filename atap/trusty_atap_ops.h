@@ -40,9 +40,6 @@ class TrustyAtapOps : public atap::OpensslOps {
     // The ID set here will be passed through to read_product_id().
     void set_product_id(uint8_t product_id[ATAP_PRODUCT_ID_LEN]);
 
-    // Returns the most recently processed UUID.
-    const char* GetLastUuid();
-
     // AtapOpsDelegate methods. Other methods are handled by OpensslOps.
     AtapResult read_product_id(uint8_t product_id[ATAP_PRODUCT_ID_LEN]) override;
 
@@ -64,7 +61,6 @@ class TrustyAtapOps : public atap::OpensslOps {
                              uint8_t sig[ATAP_SIGNATURE_LEN_MAX], uint32_t* sig_len) override;
 
   private:
-    char uuid_[ATAP_HEX_UUID_LEN + 1]{};
     uint8_t product_id_[ATAP_PRODUCT_ID_LEN]{};
 };
 

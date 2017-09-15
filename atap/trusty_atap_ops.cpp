@@ -60,10 +60,6 @@ void TrustyAtapOps::set_product_id(uint8_t product_id[ATAP_PRODUCT_ID_LEN]) {
     memcpy(product_id_, product_id, ATAP_PRODUCT_ID_LEN);
 }
 
-const char* TrustyAtapOps::GetLastUuid() {
-    return uuid_;
-}
-
 AtapResult TrustyAtapOps::read_product_id(uint8_t product_id[ATAP_PRODUCT_ID_LEN]) {
     memcpy(product_id, product_id_, ATAP_PRODUCT_ID_LEN);
     return ATAP_RESULT_OK;
@@ -112,7 +108,9 @@ AtapResult TrustyAtapOps::read_soc_global_key(uint8_t global_key[ATAP_AES_128_KE
 }
 
 AtapResult TrustyAtapOps::write_hex_uuid(const uint8_t uuid[ATAP_HEX_UUID_LEN]) {
-    memcpy(uuid_, uuid, ATAP_HEX_UUID_LEN);
+    if (KM_ERROR_OK != WriteAttestationUuid(uuid)) {
+        return ATAP_RESULT_ERROR_STORAGE;
+    }
     return ATAP_RESULT_OK;
 }
 

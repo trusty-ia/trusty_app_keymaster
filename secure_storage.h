@@ -40,6 +40,9 @@ enum class AttestationKeySlot {
     kSomEpid = 261,
 };
 
+/* The uuid size matches, by design, ATAP_HEX_UUID_LEN in system/iot/attestation/atap. */
+const size_t kAttestationUuidSize = 32;
+
 /**
  * These functions implement key and certificate chain storage on top Trusty's
  * secure storage service. All data is stored in the RPMB filesystem.
@@ -81,6 +84,16 @@ keymaster_error_t AttestationKeyExists(AttestationKeySlot key_slot, bool* exists
  * success, writes the length to |cert_chain_length|.
  */
 keymaster_error_t ReadCertChainLength(AttestationKeySlot key_slot, uint32_t* cert_chain_length);
+
+/**
+ * Reads the |attestation_uuid|. If none exists, sets the uuid to all ascii zeros.
+ */
+keymaster_error_t ReadAttestationUuid(uint8_t attestation_uuid[kAttestationUuidSize]);
+
+/**
+ * Writes the |attestation_uuid|.
+ */
+keymaster_error_t WriteAttestationUuid(const uint8_t attestation_uuid[kAttestationUuidSize]);
 
 }  // namespace keymaster
 
