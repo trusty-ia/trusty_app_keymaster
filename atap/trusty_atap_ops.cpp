@@ -98,6 +98,7 @@ AtapResult TrustyAtapOps::write_attestation_key(AtapKeyType key_type, const Atap
             return ATAP_RESULT_ERROR_STORAGE;
         }
     }
+    return ATAP_RESULT_OK;
 }
 
 AtapResult TrustyAtapOps::read_attestation_public_key(AtapKeyType key_type,
