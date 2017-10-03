@@ -20,37 +20,42 @@ MODULE := $(LOCAL_DIR)
 KEYMASTER_ROOT := $(TRUSTY_TOP)/system/keymaster
 
 MODULE_SRCS += \
-	$(KEYMASTER_ROOT)/aes_key.cpp \
-	$(KEYMASTER_ROOT)/aes_operation.cpp \
-	$(KEYMASTER_ROOT)/android_keymaster.cpp \
-	$(KEYMASTER_ROOT)/android_keymaster_messages.cpp \
-	$(KEYMASTER_ROOT)/android_keymaster_utils.cpp \
-	$(KEYMASTER_ROOT)/asymmetric_key.cpp \
-	$(KEYMASTER_ROOT)/asymmetric_key_factory.cpp \
-	$(KEYMASTER_ROOT)/attestation_record.cpp \
-	$(KEYMASTER_ROOT)/auth_encrypted_key_blob.cpp \
-	$(KEYMASTER_ROOT)/authorization_set.cpp \
-	$(KEYMASTER_ROOT)/ec_key.cpp \
-	$(KEYMASTER_ROOT)/ec_key_factory.cpp \
-	$(KEYMASTER_ROOT)/ecdsa_operation.cpp \
-	$(KEYMASTER_ROOT)/hmac_key.cpp \
-	$(KEYMASTER_ROOT)/hmac_operation.cpp \
-	$(KEYMASTER_ROOT)/key.cpp \
-	$(KEYMASTER_ROOT)/keymaster_enforcement.cpp \
-	$(KEYMASTER_ROOT)/logger.cpp \
-	$(KEYMASTER_ROOT)/ocb.c \
-	$(KEYMASTER_ROOT)/ocb_utils.cpp \
-	$(KEYMASTER_ROOT)/openssl_err.cpp \
-	$(KEYMASTER_ROOT)/openssl_utils.cpp \
-	$(KEYMASTER_ROOT)/operation.cpp \
-	$(KEYMASTER_ROOT)/operation_table.cpp \
-	$(KEYMASTER_ROOT)/rsa_key.cpp \
-	$(KEYMASTER_ROOT)/rsa_key_factory.cpp \
-	$(KEYMASTER_ROOT)/rsa_operation.cpp \
-	$(KEYMASTER_ROOT)/serializable.cpp \
-	$(KEYMASTER_ROOT)/symmetric_key.cpp \
-	$(KEYMASTER_ROOT)/keymaster_tags.cpp \
+	$(KEYMASTER_ROOT)/android_keymaster/android_keymaster.cpp \
+	$(KEYMASTER_ROOT)/android_keymaster/android_keymaster_messages.cpp \
+	$(KEYMASTER_ROOT)/android_keymaster/android_keymaster_utils.cpp \
+	$(KEYMASTER_ROOT)/android_keymaster/keymaster_enforcement.cpp \
+	$(KEYMASTER_ROOT)/android_keymaster/logger.cpp \
+	$(KEYMASTER_ROOT)/android_keymaster/authorization_set.cpp \
+	$(KEYMASTER_ROOT)/android_keymaster/operation.cpp \
+	$(KEYMASTER_ROOT)/android_keymaster/operation_table.cpp \
+	$(KEYMASTER_ROOT)/android_keymaster/serializable.cpp \
+	$(KEYMASTER_ROOT)/android_keymaster/keymaster_stl.cpp \
+	$(KEYMASTER_ROOT)/android_keymaster/keymaster_tags.cpp \
+	$(KEYMASTER_ROOT)/key_blob_utils/auth_encrypted_key_blob.cpp \
+	$(KEYMASTER_ROOT)/key_blob_utils/ocb.c \
+	$(KEYMASTER_ROOT)/key_blob_utils/ocb_utils.cpp \
+	$(KEYMASTER_ROOT)/km_openssl/aes_key.cpp \
+	$(KEYMASTER_ROOT)/km_openssl/aes_operation.cpp \
+	$(KEYMASTER_ROOT)/km_openssl/asymmetric_key.cpp \
+	$(KEYMASTER_ROOT)/km_openssl/asymmetric_key_factory.cpp \
+	$(KEYMASTER_ROOT)/km_openssl/attestation_record.cpp \
+	$(KEYMASTER_ROOT)/km_openssl/attestation_utils.cpp \
+	$(KEYMASTER_ROOT)/km_openssl/block_cipher_operation.cpp \
+	$(KEYMASTER_ROOT)/km_openssl/ckdf.cpp \
+	$(KEYMASTER_ROOT)/km_openssl/ec_key.cpp \
+	$(KEYMASTER_ROOT)/km_openssl/ec_key_factory.cpp \
+	$(KEYMASTER_ROOT)/km_openssl/ecdsa_operation.cpp \
+	$(KEYMASTER_ROOT)/km_openssl/hmac_key.cpp \
+	$(KEYMASTER_ROOT)/km_openssl/hmac_operation.cpp \
+	$(KEYMASTER_ROOT)/km_openssl/openssl_err.cpp \
+	$(KEYMASTER_ROOT)/km_openssl/openssl_utils.cpp \
+	$(KEYMASTER_ROOT)/km_openssl/rsa_key.cpp \
+	$(KEYMASTER_ROOT)/km_openssl/rsa_key_factory.cpp \
+	$(KEYMASTER_ROOT)/km_openssl/rsa_operation.cpp \
+	$(KEYMASTER_ROOT)/km_openssl/software_random_source.cpp \
+	$(KEYMASTER_ROOT)/km_openssl/symmetric_key.cpp \
 	$(LOCAL_DIR)/manifest.c \
+	$(LOCAL_DIR)/openssl_keymaster_enforcement.cpp \
 	$(LOCAL_DIR)/test_attestation_keys.cpp \
 	$(LOCAL_DIR)/trusty_keymaster.cpp \
 	$(LOCAL_DIR)/trusty_keymaster_context.cpp \
@@ -63,9 +68,9 @@ MODULE_INCLUDES := \
 	$(TRUSTY_TOP)/hardware/libhardware/include \
 	$(LOCAL_DIR)
 
-MODULE_CPPFLAGS := -std=c++11 -fno-short-enums
+MODULE_CPPFLAGS := -std=c++14 -fno-short-enums
 
-MODULE_COMPILEFLAGS := -U__ANDROID__
+MODULE_COMPILEFLAGS := -U__ANDROID__ -D__TRUSTY__
 
 #
 # Defining KEYMASTER_DEBUG will allow configure() to succeed without root of

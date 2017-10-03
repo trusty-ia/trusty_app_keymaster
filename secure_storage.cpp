@@ -198,9 +198,8 @@ keymaster_error_t WriteKeyToStorage(AttestationKeySlot key_slot,
     return KM_ERROR_OK;
 }
 
-keymaster_error_t ReadKeyFromStorage(AttestationKeySlot key_slot,
-                                     uint8_t** key,
-                                     uint32_t* key_size) {
+KeymasterKeyBlob ReadKeyFromStorage(AttestationKeySlot key_slot,
+                                    keymaster_error_t* error) {
     UniquePtr<char[]> key_file(new char[kStorageIdLengthMax]);
 
     snprintf(key_file.get(), kStorageIdLengthMax, "%s.%s", kAttestKeyPrefix,
@@ -209,17 +208,26 @@ keymaster_error_t ReadKeyFromStorage(AttestationKeySlot key_slot,
     uint64_t key_size_64;
     if (!SecureStorageGetFileSize(key_file.get(), &key_size_64) ||
         key_size_64 == 0) {
-        return KM_ERROR_UNKNOWN_ERROR;
+        if (error)
+            *error = KM_ERROR_UNKNOWN_ERROR;
+        return {};
     }
-    *key_size = static_cast<uint32_t>(key_size_64);
-    *key = new uint8_t[*key_size];
-    if (*key == nullptr) {
-        return KM_ERROR_MEMORY_ALLOCATION_FAILED;
+
+    KeymasterKeyBlob result(key_size_64);
+    if (result.key_material == nullptr) {
+        if (error)
+            *error = KM_ERROR_MEMORY_ALLOCATION_FAILED;
+        return {};
     }
-    if (!SecureStorageRead(key_file.get(), *key, *key_size)) {
-        return KM_ERROR_UNKNOWN_ERROR;
+    if (!SecureStorageRead(key_file.get(), result.writable_data(),
+                           result.key_material_size)) {
+        if (error)
+            *error = KM_ERROR_UNKNOWN_ERROR;
+        return {};
     }
-    return KM_ERROR_OK;
+    if (error)
+        *error = KM_ERROR_OK;
+    return result;
 }
 
 keymaster_error_t AttestationKeyExists(AttestationKeySlot key_slot,

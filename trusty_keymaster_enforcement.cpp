@@ -20,11 +20,15 @@
 
 #include <hardware/hw_auth_token.h>
 #include <keymaster/android_keymaster_utils.h>
+#include <keymaster/km_openssl/openssl_err.h>
 
-#include "openssl_err.h"
 #include "trusty_keymaster_context.h"
 
 namespace keymaster {
+
+keymaster_security_level_t TrustyKeymasterEnforcement::SecurityLevel() const {
+    return KM_SECURITY_LEVEL_TRUSTED_ENVIRONMENT;
+}
 
 bool TrustyKeymasterEnforcement::auth_token_timed_out(
         const hw_auth_token_t& token,
@@ -36,8 +40,8 @@ bool TrustyKeymasterEnforcement::auth_token_timed_out(
             (millis_since_boot - token_timestamp_millis) > timeout_millis);
 }
 
-uint32_t TrustyKeymasterEnforcement::get_current_time() const {
-    return milliseconds_since_boot() / 1000;
+uint64_t TrustyKeymasterEnforcement::get_current_time_ms() const {
+    return milliseconds_since_boot();
 }
 
 inline size_t min(size_t a, size_t b) {

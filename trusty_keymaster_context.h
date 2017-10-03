@@ -20,8 +20,11 @@
 #include <stdlib.h>
 
 #include <keymaster/UniquePtr.h>
-
+#include <keymaster/attestation_record.h>
 #include <keymaster/keymaster_context.h>
+#include <keymaster/soft_key_factory.h>
+
+#include <keymaster/km_openssl/software_random_source.h>
 
 #include "trusty_keymaster_enforcement.h"
 
@@ -32,7 +35,10 @@ class KeyFactory;
 static const int kAuthTokenKeySize = 32;
 static const int kMaxCertChainLength = 3;
 
-class TrustyKeymasterContext : public KeymasterContext {
+class TrustyKeymasterContext : public KeymasterContext,
+                               AttestationRecordContext,
+                               SoftwareKeyBlobMaker,
+                               SoftwareRandomSource {
 public:
     TrustyKeymasterContext();
 
@@ -70,18 +76,12 @@ public:
             const AuthorizationSet& upgrade_params,
             KeymasterKeyBlob* upgraded_key) const override;
 
-    keymaster_error_t ParseKeyBlob(
-            const KeymasterKeyBlob& blob,
-            const AuthorizationSet& additional_params,
-            KeymasterKeyBlob* key_material,
-            AuthorizationSet* hw_enforced,
-            AuthorizationSet* sw_enforced) const override;
+    keymaster_error_t ParseKeyBlob(const KeymasterKeyBlob& blob,
+                                   const AuthorizationSet& additional_params,
+                                   UniquePtr<Key>* key) const override;
 
     keymaster_error_t AddRngEntropy(const uint8_t* buf,
                                     size_t length) const override;
-
-    keymaster_error_t GenerateRandom(uint8_t* buf,
-                                     size_t length) const override;
 
     keymaster_error_t GetAuthTokenKey(keymaster_key_blob_t* key) const;
 
@@ -89,12 +89,10 @@ public:
         return &enforcement_policy_;
     }
 
-    EVP_PKEY* AttestationKey(keymaster_algorithm_t algorithm,
-                             keymaster_error_t* error) const override;
-
-    keymaster_cert_chain_t* AttestationChain(
-            keymaster_algorithm_t algorithm,
-            keymaster_error_t* error) const override;
+    keymaster_error_t GenerateAttestation(
+            const Key& key,
+            const AuthorizationSet& attest_params,
+            CertChainPtr* cert_chain) const override;
 
     keymaster_error_t GenerateUniqueId(uint64_t creation_date_time,
                                        const keymaster_blob_t& application_id,
@@ -110,6 +108,15 @@ public:
             keymaster_verified_boot_t verified_boot_state,
             bool device_locked,
             const Buffer& verified_boot_hash);
+
+    virtual keymaster_error_t UnwrapKey(
+            const KeymasterKeyBlob& wrapped_key_blob,
+            const KeymasterKeyBlob& wrapping_key_blob,
+            const AuthorizationSet& wrapping_key_params,
+            const KeymasterKeyBlob& masking_key,
+            AuthorizationSet* wrapped_key_params,
+            keymaster_key_format_t* wrapped_key_format,
+            KeymasterKeyBlob* wrapped_key_material) const override;
 
 private:
     bool SeedRngIfNeeded() const;

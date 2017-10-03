@@ -17,7 +17,7 @@
 #ifndef TRUSTY_APP_KEYMASTER_TRUSTY_KEYMASTER_ENFORCEMENT_H_
 #define TRUSTY_APP_KEYMASTER_TRUSTY_KEYMASTER_ENFORCEMENT_H_
 
-#include <keymaster/keymaster_enforcement.h>
+#include "openssl_keymaster_enforcement.h"
 
 namespace keymaster {
 
@@ -26,10 +26,11 @@ class TrustyKeymasterContext;
 const int kAccessMapTableSize = 32;
 const int kAccessCountTableSize = 32;
 
-class TrustyKeymasterEnforcement : public KeymasterEnforcement {
+class TrustyKeymasterEnforcement : public OpenSSLKeymasterEnforcement {
 public:
     TrustyKeymasterEnforcement(TrustyKeymasterContext* context)
-            : KeymasterEnforcement(kAccessMapTableSize, kAccessCountTableSize),
+            : OpenSSLKeymasterEnforcement(kAccessMapTableSize,
+                                          kAccessCountTableSize),
               context_(context) {}
     ~TrustyKeymasterEnforcement() {}
 
@@ -45,7 +46,8 @@ public:
 
     bool auth_token_timed_out(const hw_auth_token_t& token,
                               uint32_t timeout) const override;
-    uint32_t get_current_time() const override;
+    uint64_t get_current_time_ms() const override;
+    keymaster_security_level_t SecurityLevel() const override;
     bool ValidateTokenSignature(const hw_auth_token_t& token) const override;
 
 private:

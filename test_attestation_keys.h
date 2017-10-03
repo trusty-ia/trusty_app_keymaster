@@ -24,7 +24,7 @@ namespace keymaster {
  * the length to |key_length|. Caller does not take ownership of software keys
  */
 keymaster_error_t GetSoftwareAttestationKey(keymaster_algorithm_t algorithm,
-                                            uint8_t** key,
+                                            const uint8_t** key,
                                             uint32_t* key_length);
 
 /**

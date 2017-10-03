@@ -21,6 +21,12 @@
 
 namespace keymaster {
 
+template <typename>
+struct TKeymasterBlob;
+typedef TKeymasterBlob<keymaster_key_blob_t> KeymasterKeyBlob;
+class AuthorizationSet;
+class Key;
+
 // RSA and ECDSA are set to be the same as keymaster_algorithm_t.
 enum class AttestationKeySlot {
     kInvalid = 0,
@@ -55,13 +61,10 @@ keymaster_error_t WriteKeyToStorage(AttestationKeySlot key_slot,
                                     uint32_t key_size);
 
 /**
- * Reads key associated with |key_slot|. Stores bytes read in |key_size| and
- * allocates memory to |key| containing read data. Caller takes ownership of
- * |key|.
+ * Reads key associated with |key_slot|.
  */
-keymaster_error_t ReadKeyFromStorage(AttestationKeySlot key_slot,
-                                     uint8_t** key,
-                                     uint32_t* key_size);
+KeymasterKeyBlob ReadKeyFromStorage(AttestationKeySlot key_slot,
+                                    keymaster_error_t* error);
 
 /**
  * Checks if |key_slot| attestation key exists in RPMB. On success, writes to

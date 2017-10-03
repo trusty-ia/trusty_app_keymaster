@@ -50,7 +50,7 @@ struct keymaster_chan_ctx {
     long (*dispatch)(keymaster_chan_ctx*,
                      keymaster_message*,
                      uint32_t,
-                     UniquePtr<uint8_t[]>*,
+                     keymaster::UniquePtr<uint8_t[]>*,
                      uint32_t*);
 };
 
@@ -177,7 +177,7 @@ template <typename Keymaster, typename Request, typename Response>
 static long do_dispatch(void (Keymaster::*operation)(const Request&, Response*),
                         struct keymaster_message* msg,
                         uint32_t payload_size,
-                        UniquePtr<uint8_t[]>* out,
+                        keymaster::UniquePtr<uint8_t[]>* out,
                         uint32_t* out_size) {
     const uint8_t* payload = msg->payload;
     Request req;
@@ -206,7 +206,7 @@ static long do_dispatch(void (Keymaster::*operation)(const Request&, Response*),
     return NO_ERROR;
 }
 
-static long get_auth_token_key(UniquePtr<uint8_t[]>* key_buf,
+static long get_auth_token_key(keymaster::UniquePtr<uint8_t[]>* key_buf,
                                uint32_t* key_size) {
     keymaster_key_blob_t key;
     long rc = device->GetAuthTokenKey(&key);
@@ -233,7 +233,7 @@ static long get_auth_token_key(UniquePtr<uint8_t[]>* key_buf,
 static long keymaster_dispatch_secure(keymaster_chan_ctx* ctx,
                                       keymaster_message* msg,
                                       uint32_t payload_size,
-                                      UniquePtr<uint8_t[]>* out,
+                                      keymaster::UniquePtr<uint8_t[]>* out,
                                       uint32_t* out_size) {
     switch (msg->cmd) {
     case KM_GET_AUTH_TOKEN_KEY:
@@ -262,7 +262,7 @@ static bool cmd_allowed_before_configure(uint32_t cmd) {
 static long keymaster_dispatch_non_secure(keymaster_chan_ctx* ctx,
                                           keymaster_message* msg,
                                           uint32_t payload_size,
-                                          UniquePtr<uint8_t[]>* out,
+                                          keymaster::UniquePtr<uint8_t[]>* out,
                                           uint32_t* out_size) {
     if (msg->cmd == KM_GET_VERSION) {
         // KM_GET_VERSION command is always allowed
@@ -482,7 +482,7 @@ static long handle_msg(keymaster_chan_ctx* ctx) {
     MessageDeleter md(chan, msg_inf.id);
 
     // allocate msg_buf, with one extra byte for null-terminator
-    UniquePtr<uint8_t[]> msg_buf(new uint8_t[msg_inf.len + 1]);
+    keymaster::UniquePtr<uint8_t[]> msg_buf(new uint8_t[msg_inf.len + 1]);
     msg_buf[msg_inf.len] = 0;
 
     /* read msg content */
@@ -503,7 +503,7 @@ static long handle_msg(keymaster_chan_ctx* ctx) {
         return ERR_NOT_VALID;
     }
 
-    UniquePtr<uint8_t[]> out_buf;
+    keymaster::UniquePtr<uint8_t[]> out_buf;
     uint32_t out_buf_size = 0;
     keymaster_message* in_msg =
             reinterpret_cast<keymaster_message*>(msg_buf.get());
