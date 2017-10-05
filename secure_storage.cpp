@@ -73,10 +73,10 @@ class StorageSession {
 // RAII wrapper for file_handle_t
 class FileHandle {
   public:
-    FileHandle(const char* filename) {
+    FileHandle(const char* filename, int flags) {
         if (session_.error() == 0) {
             error_ = storage_open_file(session_.handle(), &handle_, const_cast<char*>(filename),
-                                       STORAGE_FILE_OPEN_CREATE, 0);
+                                       flags, 0);
         } else {
             error_ = session_.error();
         }
@@ -97,8 +97,8 @@ class FileHandle {
     file_handle_t handle_ = 0;
 };
 
-bool SecureStorageWrite(const char* filename, const uint8_t* data, uint32_t size) {
-    FileHandle file(filename);
+bool SecureStorageWrite(const char* filename, const void* data, uint32_t size) {
+    FileHandle file(filename, STORAGE_FILE_OPEN_CREATE | STORAGE_FILE_OPEN_TRUNCATE);
     if (file.error() < 0) {
         return false;
     }
@@ -114,8 +114,8 @@ bool SecureStorageWrite(const char* filename, const uint8_t* data, uint32_t size
     return true;
 }
 
-bool SecureStorageRead(const char* filename, uint8_t* data, uint32_t size) {
-    FileHandle file(filename);
+bool SecureStorageRead(const char* filename, void* data, uint32_t size) {
+    FileHandle file(filename, STORAGE_FILE_OPEN_CREATE);
     if (file.error() < 0) {
         return false;
     }
@@ -132,7 +132,7 @@ bool SecureStorageRead(const char* filename, uint8_t* data, uint32_t size) {
 }
 
 bool SecureStorageGetFileSize(const char* filename, uint64_t* size) {
-    FileHandle file(filename);
+    FileHandle file(filename, STORAGE_FILE_OPEN_CREATE);
     if (file.error() < 0) {
         return false;
     }
@@ -190,8 +190,7 @@ keymaster_error_t WriteKeyToStorage(AttestationKeySlot key_slot, const uint8_t* 
 
     snprintf(key_file.get(), kStorageIdLengthMax, "%s.%s", kAttestKeyPrefix,
              GetKeySlotStr(key_slot));
-    if (!SecureStorageDeleteFile(key_file.get()) ||
-        !SecureStorageWrite(key_file.get(), key, key_size)) {
+    if (!SecureStorageWrite(key_file.get(), key, key_size)) {
         return KM_ERROR_UNKNOWN_ERROR;
     }
     return KM_ERROR_OK;
@@ -222,19 +221,26 @@ keymaster_error_t ReadKeyFromStorage(AttestationKeySlot key_slot, uint8_t** key,
 keymaster_error_t WriteCertToStorage(AttestationKeySlot key_slot, const uint8_t* cert,
                                      uint32_t cert_size, uint32_t index) {
     UniquePtr<char[]> cert_file(new char[kStorageIdLengthMax]);
-    UniquePtr<char[]> cert_chain_length_file(new char[kStorageIdLengthMax]);
-    uint32_t cert_chain_length = index + 1;
+
+    uint32_t cert_chain_length;
+    bool update_cert_chain_length = false;
+    if (ReadCertChainLength(key_slot, &cert_chain_length) != KM_ERROR_OK) {
+        return KM_ERROR_UNKNOWN_ERROR;
+    }
+    if (index > cert_chain_length) {
+        return KM_ERROR_INVALID_ARGUMENT;
+    } else if (index == cert_chain_length) {
+        cert_chain_length += 1;
+        update_cert_chain_length = true;
+    }
 
     snprintf(cert_file.get(), kStorageIdLengthMax, "%s.%s.%d", kAttestCertPrefix,
              GetKeySlotStr(key_slot), index);
-    snprintf(cert_chain_length_file.get(), kStorageIdLengthMax, "%s.%s.length", kAttestKeyPrefix,
-             GetKeySlotStr(key_slot));
-
-    if (!SecureStorageDeleteFile(cert_file.get()) ||
-        !SecureStorageWrite(cert_file.get(), cert, cert_size) ||
-        !SecureStorageWrite(cert_chain_length_file.get(),
-                            reinterpret_cast<const uint8_t*>(&cert_chain_length),
-                            sizeof(cert_chain_length))) {
+    if (!SecureStorageWrite(cert_file.get(), cert, cert_size)) {
+        return KM_ERROR_UNKNOWN_ERROR;
+    }
+    if (update_cert_chain_length &&
+        WriteCertChainLength(key_slot, cert_chain_length) != KM_ERROR_OK) {
         return KM_ERROR_UNKNOWN_ERROR;
     }
     return KM_ERROR_OK;
@@ -294,8 +300,17 @@ keymaster_error_t ReadCertChainLength(AttestationKeySlot key_slot, uint32_t* cer
     UniquePtr<char[]> cert_chain_length_file(new char[kStorageIdLengthMax]);
     snprintf(cert_chain_length_file.get(), kStorageIdLengthMax, "%s.%s.length", kAttestKeyPrefix,
              GetKeySlotStr(key_slot));
-    if (!SecureStorageRead(cert_chain_length_file.get(),
-                           reinterpret_cast<uint8_t*>(cert_chain_length), sizeof(uint32_t)) ||
+
+    uint64_t file_size;
+    if (!SecureStorageGetFileSize(cert_chain_length_file.get(), &file_size)) {
+        return KM_ERROR_UNKNOWN_ERROR;
+    }
+    if (file_size == 0) {
+        *cert_chain_length = 0;
+        return KM_ERROR_OK;
+    }
+
+    if (!SecureStorageRead(cert_chain_length_file.get(), cert_chain_length, sizeof(uint32_t)) ||
         *cert_chain_length > kMaxCertChainLength) {
         return KM_ERROR_UNKNOWN_ERROR;
     }
@@ -317,8 +332,81 @@ keymaster_error_t ReadAttestationUuid(uint8_t attestation_uuid[kAttestationUuidS
     return KM_ERROR_OK;
 }
 
+keymaster_error_t WriteCertChainLength(AttestationKeySlot key_slot, uint32_t cert_chain_length) {
+    UniquePtr<char[]> cert_chain_length_file(new char[kStorageIdLengthMax]);
+    snprintf(cert_chain_length_file.get(), kStorageIdLengthMax, "%s.%s.length", kAttestKeyPrefix,
+             GetKeySlotStr(key_slot));
+    if (cert_chain_length > kMaxCertChainLength) {
+        return KM_ERROR_UNKNOWN_ERROR;
+    }
+
+    uint32_t current_cert_chain_length = 0;
+    if (ReadCertChainLength(key_slot, &current_cert_chain_length) != KM_ERROR_OK ||
+        cert_chain_length > current_cert_chain_length + 1) {
+        LOG_E("Error: Cannot increase certificate chain length by more than 1.", 0);
+        return KM_ERROR_INVALID_ARGUMENT;
+    }
+    if (!SecureStorageWrite(cert_chain_length_file.get(), &cert_chain_length, sizeof(uint32_t))) {
+        return KM_ERROR_UNKNOWN_ERROR;
+    }
+    return KM_ERROR_OK;
+}
+
+keymaster_error_t DeleteKey(AttestationKeySlot key_slot) {
+    UniquePtr<char[]> key_file(new char[kStorageIdLengthMax]);
+
+    snprintf(key_file.get(), kStorageIdLengthMax, "%s.%s", kAttestKeyPrefix,
+             GetKeySlotStr(key_slot));
+    if (!SecureStorageDeleteFile(key_file.get())) {
+        return KM_ERROR_UNKNOWN_ERROR;
+    }
+    return KM_ERROR_OK;
+}
+
+keymaster_error_t DeleteCertChain(AttestationKeySlot key_slot) {
+    UniquePtr<char[]> cert_file(new char[kStorageIdLengthMax]);
+    uint32_t cert_chain_length;
+
+    if (ReadCertChainLength(key_slot, &cert_chain_length) != KM_ERROR_OK) {
+        return KM_ERROR_UNKNOWN_ERROR;
+    }
+    for (size_t i = 0; i < cert_chain_length; ++i) {
+        snprintf(cert_file.get(), kStorageIdLengthMax, "%s.%s.%d", kAttestCertPrefix,
+                 GetKeySlotStr(key_slot), i);
+        if (!SecureStorageDeleteFile(cert_file.get())) {
+            return KM_ERROR_UNKNOWN_ERROR;
+        }
+    }
+    if (WriteCertChainLength(key_slot, 0) != KM_ERROR_OK) {
+        return KM_ERROR_UNKNOWN_ERROR;
+    }
+    return KM_ERROR_OK;
+}
+
 keymaster_error_t WriteAttestationUuid(const uint8_t attestation_uuid[kAttestationUuidSize]) {
     if (!SecureStorageWrite(kAttestUuidFileName, attestation_uuid, kAttestationUuidSize)) {
+        return KM_ERROR_UNKNOWN_ERROR;
+    }
+    return KM_ERROR_OK;
+}
+
+static keymaster_error_t DeleteAttestationData(AttestationKeySlot key_slot) {
+    if (DeleteKey(key_slot) != KM_ERROR_OK || DeleteCertChain(key_slot) != KM_ERROR_OK) {
+      return KM_ERROR_UNKNOWN_ERROR;
+    }
+    return KM_ERROR_OK;
+}
+
+keymaster_error_t DeleteAllAttestationData() {
+    if (DeleteAttestationData(AttestationKeySlot::kRsa) != KM_ERROR_OK ||
+        DeleteAttestationData(AttestationKeySlot::kEcdsa) != KM_ERROR_OK ||
+        DeleteAttestationData(AttestationKeySlot::kEddsa) != KM_ERROR_OK ||
+        DeleteAttestationData(AttestationKeySlot::kEpid) != KM_ERROR_OK ||
+        DeleteAttestationData(AttestationKeySlot::kClaimable0) != KM_ERROR_OK ||
+        DeleteAttestationData(AttestationKeySlot::kSomRsa) != KM_ERROR_OK ||
+        DeleteAttestationData(AttestationKeySlot::kSomEcdsa) != KM_ERROR_OK ||
+        DeleteAttestationData(AttestationKeySlot::kSomEddsa) != KM_ERROR_OK ||
+        DeleteAttestationData(AttestationKeySlot::kSomEpid) != KM_ERROR_OK) {
         return KM_ERROR_UNKNOWN_ERROR;
     }
     return KM_ERROR_OK;
