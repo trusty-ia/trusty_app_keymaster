@@ -22,16 +22,6 @@
 namespace keymaster {
 
 /**
- * Keymaster commands implemented by Trusty not used by Keymaster
- * reference implementation.
- */
-enum TrustyKeymasterCommand {
-    SET_BOOT_PARAMS = 0x1000,
-    SET_ATTESTATION_KEY = 0x2000,
-    SET_ATTESTATION_CERT_CHAIN = 0x3000,
-};
-
-/**
  * Generic struct for Keymaster requests which hold a single raw buffer.
  */
 struct RawBufferRequest : public KeymasterMessage {
@@ -74,6 +64,14 @@ struct NoResponse : public KeymasterResponse {
     size_t NonErrorSerializedSize() const override { return 0; }
     uint8_t* NonErrorSerialize(uint8_t* buf, const uint8_t* end) const override { return buf; }
     bool NonErrorDeserialize(const uint8_t** buf_ptr, const uint8_t* end) override { return true; }
+};
+
+struct NoRequest : public KeymasterMessage {
+    explicit NoRequest(int32_t ver = MAX_MESSAGE_VERSION) : KeymasterMessage(ver) {}
+
+    size_t SerializedSize() const override { return 0; }
+    uint8_t* Serialize(uint8_t* buf, const uint8_t* end) const override { return buf; }
+    bool Deserialize(const uint8_t** buf_ptr, const uint8_t* end) { return true; }
 };
 
 struct SetBootParamsRequest : public KeymasterMessage {
@@ -150,13 +148,32 @@ struct AppendAttestationCertChainRequest : public KeymasterMessage {
 struct AppendAttestationCertChainResponse : public NoResponse {};
 
 /**
- * For Android Things Attestation Provisioning (ATAP), the messages in the protocol are raw opaque
- * messages for the purposes of this IPC call.
+ * For Android Things Attestation Provisioning (ATAP), the GetCaRequest message in the protocol are
+ * raw opaque messages for the purposes of this IPC call. Since the SetCaResponse message will be
+ * very large (> 10k), SetCaResponse is split into *Begin, *Update, and *Finish operations.
  */
 struct AtapGetCaRequestRequest : public RawBufferRequest {};
 struct AtapGetCaRequestResponse : public RawBufferResponse {};
-struct AtapSetCaResponseRequest : public RawBufferRequest {};
-struct AtapSetCaResponseResponse : public NoResponse {};
+
+struct AtapSetCaResponseBeginRequest : public KeymasterMessage {
+    explicit AtapSetCaResponseBeginRequest(int32_t ver = MAX_MESSAGE_VERSION)
+        : KeymasterMessage(ver) {}
+
+    size_t SerializedSize() const override { return sizeof(uint32_t); }
+    uint8_t* Serialize(uint8_t* buf, const uint8_t* end) const override {
+        return append_uint32_to_buf(buf, end, ca_response_size);
+    }
+    bool Deserialize(const uint8_t** buf_ptr, const uint8_t* end) {
+        return copy_uint32_from_buf(buf_ptr, end, &ca_response_size);
+    }
+
+    uint32_t ca_response_size;
+};
+struct AtapSetCaResponseBeginResponse : public NoResponse {};
+struct AtapSetCaResponseUpdateRequest : public RawBufferRequest {};
+struct AtapSetCaResponseUpdateResponse : public NoResponse {};
+struct AtapSetCaResponseFinishRequest : public NoRequest {};
+struct AtapSetCaResponseFinishResponse : public NoResponse {};
 
 }  // namespace keymaster
 

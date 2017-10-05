@@ -67,6 +67,12 @@ MODULE_CPPFLAGS := -std=c++11 -fno-short-enums
 
 MODULE_COMPILEFLAGS := -U__ANDROID__
 
+#
+# Defining KEYMASTER_DEBUG will allow configure() to succeed without root of
+# trust from bootloader.
+#
+#MODULE_COMPILEFLAGS += -DKEYMASTER_DEBUG
+
 MODULE_DEPS += \
 	app/trusty \
 	lib/libc-trusty \

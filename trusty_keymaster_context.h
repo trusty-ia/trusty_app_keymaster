@@ -24,10 +24,6 @@
 #include <keymaster/keymaster_context.h>
 
 #include "trusty_keymaster_enforcement.h"
-#ifndef DISABLE_ATAP_SUPPORT
-#include "atap/trusty_atap_ops.h"
-#include "ops/atap_ops_provider.h"
-#endif
 
 namespace keymaster {
 
@@ -97,16 +93,6 @@ class TrustyKeymasterContext : public KeymasterContext {
                                     keymaster_verified_boot_t verified_boot_state,
                                     bool device_locked, const Buffer& verified_boot_hash);
 
-    keymaster_error_t SetAttestKey(keymaster_algorithm_t algorithm, const uint8_t* key,
-                                   uint32_t key_size);
-
-    keymaster_error_t AppendAttestCertChain(keymaster_algorithm_t algorithm, const uint8_t* cert,
-                                            uint32_t cert_size);
-
-    keymaster_error_t AtapGetCaRequest(const Buffer& operation_start, Buffer* ca_request);
-
-    keymaster_error_t AtapSetCaResponse(const Buffer& ca_response);
-
   private:
     bool SeedRngIfNeeded() const;
     bool ShouldReseedRng() const;
@@ -151,10 +137,6 @@ class TrustyKeymasterContext : public KeymasterContext {
     keymaster_verified_boot_t verified_boot_state_ = KM_VERIFIED_BOOT_UNVERIFIED;
     bool device_locked_ = false;
     Buffer verified_boot_hash_;
-#ifndef DISABLE_ATAP_SUPPORT
-    TrustyAtapOps atap_ops_;
-    atap::AtapOpsProvider atap_ops_provider_ {&atap_ops_};
-#endif
 };
 
 }  // namespace keymaster

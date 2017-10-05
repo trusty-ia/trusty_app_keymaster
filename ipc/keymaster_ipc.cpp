@@ -30,9 +30,9 @@ extern "C" {
 
 #include <keymaster/UniquePtr.h>
 
+#include "keymaster_ipc.h"
 #include "trusty_keymaster.h"
 #include "trusty_logger.h"
-#include "keymaster_ipc.h"
 
 using namespace keymaster;
 
@@ -62,11 +62,13 @@ static void keymaster_port_handler_secure(const uevent_t* ev, void* priv);
 static void keymaster_port_handler_non_secure(const uevent_t* ev, void* priv);
 
 static tipc_event_handler keymaster_port_evt_handler_secure = {
-    .proc = keymaster_port_handler_secure, .priv = NULL,
+    .proc = keymaster_port_handler_secure,
+    .priv = NULL,
 };
 
 static tipc_event_handler keymaster_port_evt_handler_non_secure = {
-    .proc = keymaster_port_handler_non_secure, .priv = NULL,
+    .proc = keymaster_port_handler_non_secure,
+    .priv = NULL,
 };
 
 static void keymaster_chan_handler(const uevent_t* ev, void* priv);
@@ -99,8 +101,7 @@ static long handle_port_errors(const uevent_t* ev) {
     return NO_ERROR;
 }
 
-static int wait_to_send(handle_t session, struct ipc_msg *msg)
-{
+static int wait_to_send(handle_t session, struct ipc_msg* msg) {
     int rc;
     struct uevent ev = UEVENT_INITIAL_VALUE(ev);
 
@@ -128,12 +129,12 @@ static int wait_to_send(handle_t session, struct ipc_msg *msg)
 static long send_response(handle_t chan, uint32_t cmd, uint8_t* out_buf, uint32_t out_buf_size) {
     struct keymaster_message km_msg;
     km_msg.cmd = cmd | KEYMASTER_RESP_BIT;
-    iovec_t iov[2] = {{&km_msg, sizeof(km_msg)}, {}};
+    iovec_t iov[2] = {{&km_msg, sizeof(km_msg)}, {nullptr, 0}};
     ipc_msg_t msg = {2, iov, 0, NULL};
     uint32_t msg_size;
     uint32_t bytes_remaining = out_buf_size;
     uint32_t bytes_sent = 0;
-    uint32_t max_msg_size = KEYMASTER_MAX_BUFFER_LENGTH-64;
+    uint32_t max_msg_size = KEYMASTER_MAX_BUFFER_LENGTH - 64;
 
     do {
         msg_size = MIN(max_msg_size, bytes_remaining);
@@ -228,6 +229,13 @@ static long keymaster_dispatch_secure(keymaster_chan_ctx* ctx, keymaster_message
     }
 }
 
+static bool cmd_is_from_bootloader(uint32_t cmd) {
+    return (cmd == KM_SET_BOOT_PARAMS || cmd == KM_SET_ATTESTATION_KEY ||
+            cmd == KM_APPEND_ATTESTATION_CERT_CHAIN || cmd == KM_ATAP_GET_CA_REQUEST ||
+            cmd == KM_ATAP_SET_CA_RESPONSE_BEGIN || cmd == KM_ATAP_SET_CA_RESPONSE_UPDATE ||
+            cmd == KM_ATAP_SET_CA_RESPONSE_FINISH);
+}
+
 static long keymaster_dispatch_non_secure(keymaster_chan_ctx* ctx, keymaster_message* msg,
                                           uint32_t payload_size, UniquePtr<uint8_t[]>* out,
                                           uint32_t* out_size) {
@@ -235,14 +243,9 @@ static long keymaster_dispatch_non_secure(keymaster_chan_ctx* ctx, keymaster_mes
     // Always allow commands from from bootloader to dispatch
     // If configure has not been called, only allow KM_CONFIGURE
     // If configure has been called and failed, always return the same error
-    if (msg->cmd != KM_GET_VERSION &&
-        msg->cmd != KM_SET_BOOT_PARAMS &&
-        msg->cmd != KM_SET_ATTESTATION_KEY &&
-        msg->cmd != KM_APPEND_ATTESTATION_CERT_CHAIN &&
-        msg->cmd != KM_ATAP_GET_CA_REQUEST &&
-        msg->cmd != KM_ATAP_SET_CA_RESPONSE &&
+    if (msg->cmd != KM_GET_VERSION && !cmd_is_from_bootloader(msg->cmd) &&
         ((!device->ConfigureCalled() && msg->cmd != KM_CONFIGURE) ||
-        (device->ConfigureCalled() && device->get_configure_error() != KM_ERROR_OK))) {
+         (device->ConfigureCalled() && device->get_configure_error() != KM_ERROR_OK))) {
         return ERR_NOT_CONFIGURED;
     }
 
@@ -344,9 +347,20 @@ static long keymaster_dispatch_non_secure(keymaster_chan_ctx* ctx, keymaster_mes
         LOG_D("Dispatching KM_ATAP_GET_CA_REQUEST, size %d", payload_size);
         return do_dispatch(&TrustyKeymaster::AtapGetCaRequest, msg, payload_size, out, out_size);
 
-    case KM_ATAP_SET_CA_RESPONSE:
-        LOG_D("Dispatching KM_ATAP_SET_CA_RESPONSE, size %d", payload_size);
-        return do_dispatch(&TrustyKeymaster::AtapSetCaResponse, msg, payload_size, out, out_size);
+    case KM_ATAP_SET_CA_RESPONSE_BEGIN:
+        LOG_D("Dispatching KM_ATAP_SET_CA_RESPONSE_BEGIN, size %d", payload_size);
+        return do_dispatch(&TrustyKeymaster::AtapSetCaResponseBegin, msg, payload_size, out,
+                           out_size);
+
+    case KM_ATAP_SET_CA_RESPONSE_UPDATE:
+        LOG_D("Dispatching KM_ATAP_SET_CA_RESPONSE_UPDATE, size %d", payload_size);
+        return do_dispatch(&TrustyKeymaster::AtapSetCaResponseUpdate, msg, payload_size, out,
+                           out_size);
+
+    case KM_ATAP_SET_CA_RESPONSE_FINISH:
+        LOG_D("Dispatching KM_ATAP_SET_CA_RESPONSE_FINISH, size %d", payload_size);
+        return do_dispatch(&TrustyKeymaster::AtapSetCaResponseFinish, msg, payload_size, out,
+                           out_size);
 
     default:
         LOG_E("Cannot dispatch unknown command %d", msg->cmd);
@@ -589,11 +603,11 @@ int main(void) {
     GetVersionResponse response;
     device->GetVersion(request, &response);
     if (response.error == KM_ERROR_OK) {
-      message_version = MessageVersion(
-          response.major_ver, response.minor_ver, response.subminor_ver);
+        message_version =
+            MessageVersion(response.major_ver, response.minor_ver, response.subminor_ver);
     } else {
-      LOG_E("Error %d determining AndroidKeymaster version.", response.error);
-      return ERR_GENERIC;
+        LOG_E("Error %d determining AndroidKeymaster version.", response.error);
+        return ERR_GENERIC;
     }
 
     keymaster_srv_ctx ctx;

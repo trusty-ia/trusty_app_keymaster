@@ -21,6 +21,10 @@
 
 #include "trusty_keymaster_context.h"
 #include "trusty_keymaster_messages.h"
+#ifndef DISABLE_ATAP_SUPPORT
+#include "atap/trusty_atap_ops.h"
+#include "ops/atap_ops_provider.h"
+#endif
 
 namespace keymaster {
 
@@ -40,8 +44,7 @@ class TrustyKeymaster : public AndroidKeymaster {
 
     // SetBootParams can only be called once. If it is never called then Keymaster will fail to
     // configure. The intention is that it is called from the bootloader.
-    void SetBootParams(const SetBootParamsRequest& request,
-                       SetBootParamsResponse* response);
+    void SetBootParams(const SetBootParamsRequest& request, SetBootParamsResponse* response);
 
     // SetAttestastionKey sets a single attestation key. There should be one call for each supported
     // algorithm.
@@ -62,9 +65,15 @@ class TrustyKeymaster : public AndroidKeymaster {
 
     // AtapSetCaResponse is the second of two calls that are part of the the Android Things
     // Attestation Provisioning (ATAP) protocol. This protocol is used instead of SetAttestationKey
-    // and AppendAttestationCertChain.
-    void AtapSetCaResponse(const AtapSetCaResponseRequest& request,
-                           AtapSetCaResponseResponse* response);
+    // and AppendAttestationCertChain. The CA Response message is larger than 4k, so the call is
+    // split into Begin, Update, and Finish messages.
+    void AtapSetCaResponseBegin(const AtapSetCaResponseBeginRequest& request,
+                                AtapSetCaResponseBeginResponse* response);
+
+    void AtapSetCaResponseUpdate(const AtapSetCaResponseUpdateRequest& request,
+                                 AtapSetCaResponseUpdateResponse* response);
+    void AtapSetCaResponseFinish(const AtapSetCaResponseFinishRequest& request,
+                                 AtapSetCaResponseFinishResponse* response);
 
     bool ConfigureCalled() { return configure_error_ != KM_ERROR_KEYMASTER_NOT_CONFIGURED; }
     keymaster_error_t get_configure_error() { return configure_error_; }
@@ -73,6 +82,11 @@ class TrustyKeymaster : public AndroidKeymaster {
   private:
     TrustyKeymasterContext* context_;
     keymaster_error_t configure_error_ = KM_ERROR_KEYMASTER_NOT_CONFIGURED;
+    Buffer ca_response_;
+#ifndef DISABLE_ATAP_SUPPORT
+    TrustyAtapOps atap_ops_;
+    atap::AtapOpsProvider atap_ops_provider_{&atap_ops_};
+#endif
 };
 
-}  // namespace
+}  // namespace keymaster
