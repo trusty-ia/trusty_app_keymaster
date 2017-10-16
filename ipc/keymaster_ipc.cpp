@@ -28,7 +28,7 @@ extern "C" {
 
 #include <interface/keymaster/keymaster.h>
 
-#include <UniquePtr.h>
+#include <keymaster/UniquePtr.h>
 
 #include "trusty_keymaster.h"
 #include "trusty_logger.h"

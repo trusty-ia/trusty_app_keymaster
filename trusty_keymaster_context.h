@@ -19,7 +19,7 @@
 
 #include <stdlib.h>
 
-#include <UniquePtr.h>
+#include <keymaster/UniquePtr.h>
 
 #include <keymaster/keymaster_context.h>
 
