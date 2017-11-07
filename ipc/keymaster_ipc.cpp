@@ -543,9 +543,15 @@ static long keymaster_ipc_init(keymaster_srv_ctx* ctx) {
     return NO_ERROR;
 }
 
+extern "C" {
+void cse_init(void);
+}
+
 int main(void) {
     long rc;
     uevent_t event;
+
+    cse_init();
 
     TrustyLogger::initialize();
 

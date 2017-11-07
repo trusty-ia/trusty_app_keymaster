@@ -56,13 +56,15 @@ MODULE_SRCS += \
 	$(LOCAL_DIR)/trusty_keymaster.cpp \
 	$(LOCAL_DIR)/trusty_keymaster_context.cpp \
 	$(LOCAL_DIR)/trusty_keymaster_enforcement.cpp \
-	$(LOCAL_DIR)/secure_storage.cpp
+	$(LOCAL_DIR)/secure_storage.cpp \
+	$(LOCAL_DIR)/heci/heci.c \
 
 MODULE_INCLUDES := \
 	$(KEYMASTER_ROOT)/include \
 	$(KEYMASTER_ROOT) \
 	$(LOCAL_DIR) \
-	$(ANDROID_ROOT)/hardware/libhardware/include
+	$(ANDROID_ROOT)/hardware/libhardware/include \
+	$(LOCAL_DIR)/heci \
 
 MODULE_CPPFLAGS := -std=c++11 \
 	-mpreferred-stack-boundary=5 -mstackrealign -fno-short-enums
