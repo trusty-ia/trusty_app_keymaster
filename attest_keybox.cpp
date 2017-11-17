@@ -17,6 +17,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <trusty_std.h>
 #include <openssl/base64.h>
 #include "trusty_keymaster.h"
 #include "attest_keybox.h"
@@ -98,20 +99,38 @@ static XMLElement *tinyxml2_FindElement(XMLElement *root, XMLElement *element, c
     return NULL;
 }
 
-extern "C" {
-    int get_keybox(uint8_t **keybox, uint32_t *keybox_size);
-}
-
 /* the keybox will be retrieved from the CSE side */
 keymaster_error_t RetrieveKeybox(uint8_t** keybox, uint32_t* keybox_size) {
     int rc = -1;
+    trusty_device_info_t *dev_info = NULL;
+    uint32_t buffer_size = sizeof(trusty_device_info_t) + MAX_ATTKB_SIZE;
 
-    rc = get_keybox(keybox, keybox_size);
+    if((keybox_size == NULL) || (keybox == NULL))
+        return KM_ERROR_UNEXPECTED_NULL_POINTER;
+
+    dev_info = (trusty_device_info_t *)malloc(buffer_size);
+    if(!dev_info)
+        return KM_ERROR_MEMORY_ALLOCATION_FAILED;
+    memset(dev_info, 0, buffer_size);
+    rc = get_device_info(dev_info, GET_ATTKB);
     if(rc != 0) {
         LOG_E("RetrieveKeybox failed!", 0);
+        memset(dev_info, 0, buffer_size);
+        free(dev_info);
         return KM_ERROR_UNKNOWN_ERROR;
     }
 
+    *keybox_size = dev_info->attkb_size;
+    *keybox = (uint8_t *)malloc(dev_info->attkb_size);
+    if(*keybox == NULL) {
+        memset(dev_info, 0, buffer_size);
+        free(dev_info);
+        return KM_ERROR_MEMORY_ALLOCATION_FAILED;
+    }
+    memcpy_s(*keybox, *keybox_size, dev_info->attkb, *keybox_size);
+
+    memset(dev_info, 0, buffer_size);
+    free(dev_info);
     return KM_ERROR_OK;
 }
 
