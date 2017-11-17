@@ -15,7 +15,6 @@
  */
 #include <stddef.h>
 #include <trusty_app_manifest.h>
-#include <heci_impl.h>
 
 trusty_app_manifest_t TRUSTY_APP_MANIFEST_ATTRS trusty_app_manifest =
 {
@@ -29,11 +28,5 @@ trusty_app_manifest_t TRUSTY_APP_MANIFEST_ATTRS trusty_app_manifest =
 
 		/* openssl need a larger stack */
 		TRUSTY_APP_CONFIG_MIN_STACK_SIZE(8 * 4096),
-
-		/* for cse mmio */
-		TRUSTY_APP_CONFIG_MAP_MEM(1, PCI_BDF(HECI_BUS, HECI_DEVICE_NUMBER, HECI_FUNCTION_NUMBER), 0x1000),
-		/* mapping HPET base address */
-		TRUSTY_APP_CONFIG_MAP_MEM(2, HPET_BASE_ADDRESS, 0x1000),
 	},
 };
-
