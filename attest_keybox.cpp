@@ -116,12 +116,10 @@ keymaster_error_t RetrieveKeybox(uint8_t** keybox, uint32_t* keybox_size) {
 }
 
 keymaster_error_t keybox_xml_initialize(const uint8_t* keybox, XMLElement** xml_root) {
-    XMLDocument * doc = new XMLDocument;
-
-    if (keybox == NULL) {
+    if ((keybox == NULL) || (xml_root == NULL))
         return KM_ERROR_INVALID_ARGUMENT;
-    }
 
+    XMLDocument *doc = new XMLDocument;
     if (doc == NULL)
         return KM_ERROR_MEMORY_ALLOCATION_FAILED;
 
@@ -152,28 +150,28 @@ keymaster_error_t get_prikey_from_keybox(XMLElement* xml_root,
     uint32_t count;
 
     if ((key == NULL) || (key_size == NULL))
-        return KM_ERROR_UNKNOWN_ERROR;
+        return KM_ERROR_INVALID_ARGUMENT;
 
-    if (xml_root == NULL) {
-            return KM_ERROR_UNKNOWN_ERROR;
-    }
+    if (xml_root == NULL)
+        return KM_ERROR_INVALID_ARGUMENT;
 
     if (algorithm == KM_ALGORITHM_RSA) {
         subroot = tinyxml2_FindElement(xml_root, NULL, "Key", "algorithm", XML_KEY_ALGORITHM_RSA_STRING);
         element = tinyxml2_FindElement(subroot, NULL, "PrivateKey", NULL, NULL);
-        if (element == NULL) {
+        if (element == NULL)
             return KM_ERROR_UNKNOWN_ERROR;
-        }
         text = (char *)element->GetText();
+        if (text == NULL)
+            return KM_ERROR_UNKNOWN_ERROR;
         count = strlen(text);
-        if ((p = strstr(text, "-----BEGIN RSA PRIVATE KEY-----")) == NULL) {
+        if ((p = strstr(text, "-----BEGIN RSA PRIVATE KEY-----")) == NULL)
             return KM_ERROR_UNKNOWN_ERROR;
-        }
         pstart = p + strlen("-----BEGIN RSA PRIVATE KEY-----");
-        if ((pend = strstr(text, "-----END RSA PRIVATE KEY-----")) == NULL) {
+        if ((pend = strstr(text, "-----END RSA PRIVATE KEY-----")) == NULL)
             return KM_ERROR_UNKNOWN_ERROR;
-        }
         base64data = new char[count];
+        if (base64data == NULL)
+            return KM_ERROR_MEMORY_ALLOCATION_FAILED;
         count = 0;
         for (p = pstart; p < pend; p++) {
             if (!isspace(*p))
@@ -183,19 +181,20 @@ keymaster_error_t get_prikey_from_keybox(XMLElement* xml_root,
     } else if (algorithm == KM_ALGORITHM_EC) {
         subroot = tinyxml2_FindElement(xml_root, NULL, "Key", "algorithm", XML_KEY_ALGORITHM_EC_STRING);
         element = tinyxml2_FindElement(subroot, NULL, "PrivateKey", NULL, NULL);
-        if (element == NULL) {
+        if (element == NULL)
             return KM_ERROR_UNKNOWN_ERROR;
-        }
         text = (char *)element->GetText();
+        if (text == NULL)
+            return KM_ERROR_UNKNOWN_ERROR;
         count = strlen(text);
-        if ((p = strstr(text, "-----BEGIN EC PRIVATE KEY-----")) == NULL) {
+        if ((p = strstr(text, "-----BEGIN EC PRIVATE KEY-----")) == NULL)
             return KM_ERROR_UNKNOWN_ERROR;
-        }
         pstart = p + strlen("-----BEGIN EC PRIVATE KEY-----");
-        if ((pend = strstr(text, "-----END EC PRIVATE KEY-----")) == NULL) {
+        if ((pend = strstr(text, "-----END EC PRIVATE KEY-----")) == NULL)
             return KM_ERROR_UNKNOWN_ERROR;
-        }
         base64data = new char[count];
+        if (base64data == NULL)
+            return KM_ERROR_MEMORY_ALLOCATION_FAILED;
         count = 0;
         for (p = pstart; p < pend; p++) {
             if (!isspace(*p))
@@ -208,6 +207,8 @@ keymaster_error_t get_prikey_from_keybox(XMLElement* xml_root,
     }
 
     decodedata = new uint8_t[count];
+    if (decodedata == NULL)
+        return KM_ERROR_MEMORY_ALLOCATION_FAILED;
     if (!EVP_DecodeBase64(decodedata, (size_t *)&count, count, (const uint8_t *)base64data, strlen(base64data))) {
         LOG_E("Failed to do base64 decode!", 0);
         return KM_ERROR_UNKNOWN_ERROR;
@@ -226,17 +227,15 @@ keymaster_error_t get_cert_chain_len_from_keybox(XMLElement* xml_root,
     int count;
 
     if (cert_chain_len == NULL)
-        return KM_ERROR_UNKNOWN_ERROR;
+        return KM_ERROR_INVALID_ARGUMENT;
 
-    if (xml_root == NULL) {
-            return KM_ERROR_UNKNOWN_ERROR;
-    }
+    if (xml_root == NULL)
+        return KM_ERROR_INVALID_ARGUMENT;
 
     if (algorithm == KM_ALGORITHM_RSA) {
         subroot = tinyxml2_FindElement(xml_root, NULL, "Key", "algorithm", XML_KEY_ALGORITHM_RSA_STRING);
-        if (subroot == NULL) {
+        if (subroot == NULL)
             return KM_ERROR_UNKNOWN_ERROR;
-        }
         count = 0;
         for (element = tinyxml2_FindElement(subroot, NULL, "Certificate", NULL, NULL); element;
              element = tinyxml2_FindElement(subroot, element, "Certificate", NULL, NULL)) {
@@ -244,9 +243,8 @@ keymaster_error_t get_cert_chain_len_from_keybox(XMLElement* xml_root,
         }
     } else if (algorithm == KM_ALGORITHM_EC) {
         subroot = tinyxml2_FindElement(xml_root, NULL, "Key", "algorithm", XML_KEY_ALGORITHM_EC_STRING);
-        if (subroot == NULL) {
+        if (subroot == NULL)
             return KM_ERROR_UNKNOWN_ERROR;
-        }
         count = 0;
         for (element = tinyxml2_FindElement(subroot, NULL, "Certificate", NULL, NULL); element;
              element = tinyxml2_FindElement(subroot, element, "Certificate", NULL, NULL)) {
@@ -275,45 +273,43 @@ keymaster_error_t get_cert_from_keybox(XMLElement* xml_root,
     uint32_t count;
 
     if ((cert == NULL) || (cert_size == NULL))
-        return KM_ERROR_UNKNOWN_ERROR;
+        return KM_ERROR_INVALID_ARGUMENT;
 
-    if (xml_root == NULL) {
-            return KM_ERROR_UNKNOWN_ERROR;
-    }
+    if (xml_root == NULL)
+        return KM_ERROR_INVALID_ARGUMENT;
 
-    if (algorithm == KM_ALGORITHM_RSA) {
+    if (algorithm == KM_ALGORITHM_RSA)
         subroot = tinyxml2_FindElement(xml_root, NULL, "Key", "algorithm", XML_KEY_ALGORITHM_RSA_STRING);
-    } else if (algorithm == KM_ALGORITHM_EC) {
+    else if (algorithm == KM_ALGORITHM_EC)
         subroot = tinyxml2_FindElement(xml_root, NULL, "Key", "algorithm", XML_KEY_ALGORITHM_EC_STRING);
-    } else {
+    else {
         LOG_E("No matched key in keybox!", 0);
         return KM_ERROR_UNKNOWN_ERROR;
     }
-    if (subroot == NULL) {
+    if (subroot == NULL)
         return KM_ERROR_UNKNOWN_ERROR;
-    }
     count = 0;
     for (element = tinyxml2_FindElement(subroot, NULL, "Certificate", NULL, NULL); element;
          element = tinyxml2_FindElement(subroot, element, "Certificate", NULL, NULL)) {
-        if (cert_index == count) {
+        if (cert_index == count)
             break;
-        } else {
+        else
             count++;
-        }
     }
-    if (element == NULL) {
+    if (element == NULL)
         return KM_ERROR_UNKNOWN_ERROR;
-    }
     text = (char *)element->GetText();
+    if (text == NULL)
+        return KM_ERROR_UNKNOWN_ERROR;
     count = strlen(text);
-    if ((p = strstr(text, "-----BEGIN CERTIFICATE-----")) == NULL) {
+    if ((p = strstr(text, "-----BEGIN CERTIFICATE-----")) == NULL)
         return KM_ERROR_UNKNOWN_ERROR;
-    }
     pstart = p + strlen("-----BEGIN CERTIFICATE-----");
-    if ((pend = strstr(text, "-----END CERTIFICATE-----")) == NULL) {
+    if ((pend = strstr(text, "-----END CERTIFICATE-----")) == NULL)
         return KM_ERROR_UNKNOWN_ERROR;
-    }
     base64data = new char[count];
+    if (base64data == NULL)
+        return KM_ERROR_MEMORY_ALLOCATION_FAILED;
     count = 0;
     for (p = pstart; p < pend; p++) {
         if (!isspace(*p))
@@ -322,6 +318,8 @@ keymaster_error_t get_cert_from_keybox(XMLElement* xml_root,
     base64data[count] = 0x00;
 
     decodedata = new uint8_t[count];
+    if (decodedata == NULL)
+        return KM_ERROR_MEMORY_ALLOCATION_FAILED;
     if (!EVP_DecodeBase64(decodedata, (size_t *)&count, count, (const uint8_t *)base64data, strlen(base64data))) {
         LOG_E("Failed to do base64 decode!", 0);
         return KM_ERROR_UNKNOWN_ERROR;
