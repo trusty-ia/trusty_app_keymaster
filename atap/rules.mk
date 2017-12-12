@@ -21,7 +21,6 @@ MODULE_SRCS += \
   $(ATAP_ROOT)/libatap/atap_commands.c \
   $(ATAP_ROOT)/libatap/atap_sysdeps_posix.c \
   $(ATAP_ROOT)/libatap/atap_util.c \
-  $(ATAP_ROOT)/libatap/atap_util.c \
   $(ATAP_ROOT)/ops/atap_ops_provider.cpp \
   $(ATAP_ROOT)/ops/openssl_ops.cpp \
   $(CUR_DIR)/trusty_atap_ops.cpp
