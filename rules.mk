@@ -76,7 +76,8 @@ MODULE_DEPS += \
 	lib/rng \
 	lib/storage \
 	lib/hwkey \
-	lib/tinyxml2
+	lib/tinyxml2 \
+	lib/lzma
 
 include $(LOCAL_DIR)/$(IPC)/rules.mk
 
