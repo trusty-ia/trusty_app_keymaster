@@ -21,6 +21,13 @@ using namespace tinyxml2;
 
 namespace keymaster {
 
+typedef struct attk_keybox_header {
+   uint16_t version;     // version
+   uint16_t size;        // size excluding this header
+   uint8_t  format;      // indicates file format, 0 = plain, 1 = LZMA
+   uint8_t  reserved[3]; // not used
+} attkb_header_t;
+
 keymaster_error_t RetrieveKeybox(uint8_t** keybox, uint32_t* keybox_size);
 
 keymaster_error_t keybox_xml_initialize(const uint8_t* keybox, XMLElement** xml_root);

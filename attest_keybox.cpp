@@ -21,11 +21,18 @@
 #include <openssl/base64.h>
 #include "trusty_keymaster.h"
 #include "attest_keybox.h"
+#include "LzmaDec.h"
 
 #define XML_KEY_ALGORITHM_EC_STRING     "ecdsa"
 #define XML_KEY_ALGORITHM_RSA_STRING    "rsa"
 
 namespace keymaster {
+
+#define LZMA_HEADER_SIZE    (LZMA_PROPS_SIZE + 8)
+#define UNUSED_VAR(x) (void)x;
+static void *AllocForLzma(void *p, size_t size) { UNUSED_VAR(p); return malloc(size); }
+static void FreeForLzma(void *p, void *address) { UNUSED_VAR(p); free(address); }
+static ISzAlloc g_AllocForLzma = { &AllocForLzma, &FreeForLzma };
 
 static XMLElement *tinyxml2_WalkNextElement(XMLElement *root, XMLElement *element)
 {
@@ -99,11 +106,42 @@ static XMLElement *tinyxml2_FindElement(XMLElement *root, XMLElement *element, c
     return NULL;
 }
 
+static uint8_t *decompress_attkb(uint8_t* keybox, size_t compressed_size) {
+    size_t outlen = 0, inlen = compressed_size - LZMA_HEADER_SIZE;
+    uint8_t *s = NULL, *decompressed_attkb = NULL;
+    ELzmaStatus status;
+    SRes res;
+
+    s = keybox;
+    outlen = s[LZMA_PROPS_SIZE] |
+            (s[LZMA_PROPS_SIZE + 1] << 8) |
+            (s[LZMA_PROPS_SIZE + 2] << 16) |
+            (s[LZMA_PROPS_SIZE + 3] << 24);
+
+    decompressed_attkb = (uint8_t *)malloc(outlen);
+    if(decompressed_attkb == NULL)
+        return NULL;
+
+    res = LzmaDecode(decompressed_attkb, &outlen, s + LZMA_HEADER_SIZE, &inlen,
+               s, LZMA_PROPS_SIZE, LZMA_FINISH_ANY, &status, &g_AllocForLzma);
+    if(res) {
+        LOG_E("attkb decompression failed! res (%d), status(%d)", res, status);
+        free(decompressed_attkb);
+        return NULL;
+    }
+
+    return decompressed_attkb;
+}
+
+
 /* the keybox will be retrieved from the CSE side */
 keymaster_error_t RetrieveKeybox(uint8_t** keybox, uint32_t* keybox_size) {
     int rc = -1;
+    keymaster_error_t ret = KM_ERROR_OK;
     trusty_device_info_t *dev_info = NULL;
     uint32_t buffer_size = sizeof(trusty_device_info_t) + MAX_ATTKB_SIZE;
+    attkb_header_t *attkb_hdr = NULL;
+    size_t attkb_hdr_size = 0;
 
     if((keybox_size == NULL) || (keybox == NULL))
         return KM_ERROR_UNEXPECTED_NULL_POINTER;
@@ -115,23 +153,35 @@ keymaster_error_t RetrieveKeybox(uint8_t** keybox, uint32_t* keybox_size) {
     rc = get_device_info(dev_info, GET_ATTKB);
     if(rc != 0) {
         LOG_E("RetrieveKeybox failed!", 0);
-        memset(dev_info, 0, buffer_size);
-        free(dev_info);
-        return KM_ERROR_UNKNOWN_ERROR;
+        ret = KM_ERROR_UNKNOWN_ERROR;
+        goto clear_sensitive_data;
     }
 
     *keybox_size = dev_info->attkb_size;
     *keybox = (uint8_t *)malloc(dev_info->attkb_size);
     if(*keybox == NULL) {
-        memset(dev_info, 0, buffer_size);
-        free(dev_info);
-        return KM_ERROR_MEMORY_ALLOCATION_FAILED;
+        ret = KM_ERROR_UNKNOWN_ERROR;
+        goto clear_sensitive_data;
     }
     memcpy_s(*keybox, *keybox_size, dev_info->attkb, *keybox_size);
 
+    attkb_hdr = (attkb_header_t *)(*keybox);
+    if(attkb_hdr->format) {
+        uint8_t* decompressed_attkb = NULL;
+        attkb_hdr_size = sizeof(attkb_header_t);
+        decompressed_attkb = decompress_attkb(*keybox + attkb_hdr_size, attkb_hdr->size);
+        free(*keybox);
+        *keybox = decompressed_attkb;
+        if(decompressed_attkb == NULL) {
+            ret = KM_ERROR_UNKNOWN_ERROR;
+            goto clear_sensitive_data;
+        }
+    }
+
+clear_sensitive_data:
     memset(dev_info, 0, buffer_size);
     free(dev_info);
-    return KM_ERROR_OK;
+    return ret;
 }
 
 keymaster_error_t keybox_xml_initialize(const uint8_t* keybox, XMLElement** xml_root) {
