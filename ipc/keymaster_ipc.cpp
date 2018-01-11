@@ -102,7 +102,7 @@ static long handle_port_errors(const uevent_t* ev) {
 static int wait_to_send(handle_t session, struct ipc_msg *msg)
 {
     int rc;
-    struct uevent ev = {0};
+    struct uevent ev = UEVENT_INITIAL_VALUE(ev);
 
     rc = wait(session, &ev, -1);
     if (rc < 0) {
