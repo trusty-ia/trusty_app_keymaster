@@ -166,7 +166,8 @@ keymaster_error_t RetrieveKeybox(uint8_t** keybox, uint32_t* keybox_size) {
     memcpy_s(*keybox, *keybox_size, dev_info->attkb, *keybox_size);
 
     attkb_hdr = (attkb_header_t *)(*keybox);
-    if(attkb_hdr->format) {
+    /* indicates file format, 0 = plain, 1 = LZMA */
+    if((attkb_hdr->version == 1) && (attkb_hdr->format == 1)) {
         uint8_t* decompressed_attkb = NULL;
         attkb_hdr_size = sizeof(attkb_header_t);
         decompressed_attkb = decompress_attkb(*keybox + attkb_hdr_size, attkb_hdr->size);
