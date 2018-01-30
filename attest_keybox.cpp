@@ -150,7 +150,7 @@ keymaster_error_t RetrieveKeybox(uint8_t** keybox, uint32_t* keybox_size) {
     if(!dev_info)
         return KM_ERROR_MEMORY_ALLOCATION_FAILED;
     memset(dev_info, 0, buffer_size);
-    rc = get_device_info(dev_info, GET_ATTKB);
+    rc = get_device_info(dev_info);
     if(rc != 0) {
         LOG_E("RetrieveKeybox failed!", 0);
         ret = KM_ERROR_UNKNOWN_ERROR;
