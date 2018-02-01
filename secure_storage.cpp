@@ -244,7 +244,7 @@ keymaster_error_t ReadCertChainFromStorage(keymaster_algorithm_t algorithm,
 
     // Read |cert_chain_length| certs from storage
     for (size_t i = 0; i < cert_chain_length; ++i) {
-        snprintf(cert_file.get(), kStorageIdLengthMax, "%s.%s.%d", kAttestCertPrefix,
+        snprintf(cert_file.get(), kStorageIdLengthMax, "%s.%s.%ld", kAttestCertPrefix,
                  GetAlgorithmStr(algorithm), i);
         if (!SecureStorageGetFileSize(cert_file.get(), &cert_size) || cert_size == 0) {
             return KM_ERROR_UNKNOWN_ERROR;

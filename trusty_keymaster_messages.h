@@ -118,7 +118,9 @@ struct ProvsionAttesationKeyboxRequest : public KeymasterMessage {
     explicit ProvsionAttesationKeyboxRequest(int32_t ver = MAX_MESSAGE_VERSION)
         : KeymasterMessage(ver) {}
 
-    size_t SerializedSize() const override {keybox_data.SerializedSize(); }
+    size_t SerializedSize() const override {
+        return keybox_data.SerializedSize();
+    }
     uint8_t* Serialize(uint8_t* buf, const uint8_t* end) const override {
         return keybox_data.Serialize(buf, end);
     }
