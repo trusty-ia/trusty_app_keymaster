@@ -205,6 +205,8 @@ keymaster_error_t TrustyKeymasterContext::SetAuthorizations(const AuthorizationS
 
             sw_enforced->push_back(entry);
             break;
+        default:
+            break;
         }
     }
 
