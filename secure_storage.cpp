@@ -17,7 +17,7 @@
 #include "secure_storage.h"
 
 extern "C" {
-#include <err.h>
+#include <uapi/err.h>
 #include <errno.h>
 #include <stdio.h>
 

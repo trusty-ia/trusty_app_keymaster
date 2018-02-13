@@ -23,7 +23,7 @@ extern "C" {
 #include <stdio.h>
 #include <string.h>
 
-#include <err.h>
+#include <uapi/err.h>
 #include <trusty_std.h>
 
 #include <interface/keymaster/keymaster.h>

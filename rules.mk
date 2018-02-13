@@ -60,6 +60,7 @@ MODULE_SRCS += \
 MODULE_INCLUDES := \
 	$(KEYMASTER_ROOT)/include \
 	$(KEYMASTER_ROOT) \
+	$(LOCAL_DIR)/../../hardware/libhardware/include \
 	$(LOCAL_DIR)
 
 MODULE_CPPFLAGS := -std=c++11 -fno-short-enums
