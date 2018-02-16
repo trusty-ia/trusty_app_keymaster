@@ -229,6 +229,7 @@ static long keymaster_dispatch_secure(keymaster_chan_ctx* ctx, keymaster_message
     }
 }
 
+// Returns true if |cmd| is called from the bootloader
 static bool cmd_is_from_bootloader(uint32_t cmd) {
     return (cmd == KM_SET_BOOT_PARAMS || cmd == KM_SET_ATTESTATION_KEY ||
             cmd == KM_APPEND_ATTESTATION_CERT_CHAIN || cmd == KM_ATAP_GET_CA_REQUEST ||
@@ -236,17 +237,29 @@ static bool cmd_is_from_bootloader(uint32_t cmd) {
             cmd == KM_ATAP_SET_CA_RESPONSE_FINISH);
 }
 
+// Returns true if |cmd| can be used before the configure command
+static bool cmd_allowed_before_configure(uint32_t cmd) {
+    return cmd == KM_CONFIGURE || cmd == KM_GET_VERSION || cmd_is_from_bootloader(cmd);
+}
+
 static long keymaster_dispatch_non_secure(keymaster_chan_ctx* ctx, keymaster_message* msg,
                                           uint32_t payload_size, UniquePtr<uint8_t[]>* out,
                                           uint32_t* out_size) {
-    // Always allow KM_GET_VERSION to dispatch
-    // Always allow commands from from bootloader to dispatch
-    // If configure has not been called, only allow KM_CONFIGURE
-    // If configure has been called and failed, always return the same error
-    if (msg->cmd != KM_GET_VERSION && !cmd_is_from_bootloader(msg->cmd) &&
-        ((!device->ConfigureCalled() && msg->cmd != KM_CONFIGURE) ||
-         (device->ConfigureCalled() && device->get_configure_error() != KM_ERROR_OK))) {
-        return ERR_NOT_CONFIGURED;
+    if (msg->cmd == KM_GET_VERSION) {
+        // KM_GET_VERSION command is always allowed
+    } else if (!device->ConfigureCalled()) {
+        if (!cmd_allowed_before_configure(msg->cmd)) {
+            LOG_E("Command %d not allowed before configure command\n", msg->cmd);
+            return ERR_NOT_CONFIGURED;
+        }
+    } else if (device->ConfigureCalled()) {
+        if (device->get_configure_error() != KM_ERROR_OK) {
+            LOG_E("Previous configure command failed\n", 0);
+            return ERR_NOT_CONFIGURED;
+        } else if (cmd_is_from_bootloader(msg->cmd)) {
+            LOG_E("Bootloader command %d not allowed after configure command\n", msg->cmd);
+            return ERR_NOT_IMPLEMENTED;
+        }
     }
 
     switch (msg->cmd) {
