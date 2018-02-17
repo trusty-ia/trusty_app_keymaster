@@ -218,6 +218,19 @@ keymaster_error_t ReadKeyFromStorage(AttestationKeySlot key_slot, uint8_t** key,
     return KM_ERROR_OK;
 }
 
+keymaster_error_t AttestationKeyExists(AttestationKeySlot key_slot, bool* exists) {
+    UniquePtr<char[]> key_file(new char[kStorageIdLengthMax]);
+
+    snprintf(key_file.get(), kStorageIdLengthMax, "%s.%s", kAttestKeyPrefix,
+             GetKeySlotStr(key_slot));
+    uint64_t size;
+    if (!SecureStorageGetFileSize(key_file.get(), &size)) {
+        return KM_ERROR_UNKNOWN_ERROR;
+    }
+    *exists = size > 0;
+    return KM_ERROR_OK;
+}
+
 keymaster_error_t WriteCertToStorage(AttestationKeySlot key_slot, const uint8_t* cert,
                                      uint32_t cert_size, uint32_t index) {
     UniquePtr<char[]> cert_file(new char[kStorageIdLengthMax]);
@@ -283,16 +296,23 @@ keymaster_error_t ReadCertChainFromStorage(AttestationKeySlot key_slot,
     return KM_ERROR_OK;
 }
 
-keymaster_error_t AttestationKeyExists(AttestationKeySlot key_slot, bool* exists) {
-    UniquePtr<char[]> key_file(new char[kStorageIdLengthMax]);
-
-    snprintf(key_file.get(), kStorageIdLengthMax, "%s.%s", kAttestKeyPrefix,
+keymaster_error_t WriteCertChainLength(AttestationKeySlot key_slot, uint32_t cert_chain_length) {
+    UniquePtr<char[]> cert_chain_length_file(new char[kStorageIdLengthMax]);
+    snprintf(cert_chain_length_file.get(), kStorageIdLengthMax, "%s.%s.length", kAttestKeyPrefix,
              GetKeySlotStr(key_slot));
-    uint64_t size;
-    if (!SecureStorageGetFileSize(key_file.get(), &size)) {
+    if (cert_chain_length > kMaxCertChainLength) {
         return KM_ERROR_UNKNOWN_ERROR;
     }
-    *exists = size > 0;
+
+    uint32_t current_cert_chain_length = 0;
+    if (ReadCertChainLength(key_slot, &current_cert_chain_length) != KM_ERROR_OK ||
+        cert_chain_length > current_cert_chain_length + 1) {
+        LOG_E("Error: Cannot increase certificate chain length by more than 1.", 0);
+        return KM_ERROR_INVALID_ARGUMENT;
+    }
+    if (!SecureStorageWrite(cert_chain_length_file.get(), &cert_chain_length, sizeof(uint32_t))) {
+        return KM_ERROR_UNKNOWN_ERROR;
+    }
     return KM_ERROR_OK;
 }
 
@@ -317,6 +337,13 @@ keymaster_error_t ReadCertChainLength(AttestationKeySlot key_slot, uint32_t* cer
     return KM_ERROR_OK;
 }
 
+keymaster_error_t WriteAttestationUuid(const uint8_t attestation_uuid[kAttestationUuidSize]) {
+    if (!SecureStorageWrite(kAttestUuidFileName, attestation_uuid, kAttestationUuidSize)) {
+        return KM_ERROR_UNKNOWN_ERROR;
+    }
+    return KM_ERROR_OK;
+}
+
 keymaster_error_t ReadAttestationUuid(uint8_t attestation_uuid[kAttestationUuidSize]) {
     uint64_t size;
     if (!SecureStorageGetFileSize(kAttestUuidFileName, &size)) {
@@ -327,26 +354,6 @@ keymaster_error_t ReadAttestationUuid(uint8_t attestation_uuid[kAttestationUuidS
         return KM_ERROR_OK;
     }
     if (!SecureStorageRead(kAttestUuidFileName, attestation_uuid, kAttestationUuidSize)) {
-        return KM_ERROR_UNKNOWN_ERROR;
-    }
-    return KM_ERROR_OK;
-}
-
-keymaster_error_t WriteCertChainLength(AttestationKeySlot key_slot, uint32_t cert_chain_length) {
-    UniquePtr<char[]> cert_chain_length_file(new char[kStorageIdLengthMax]);
-    snprintf(cert_chain_length_file.get(), kStorageIdLengthMax, "%s.%s.length", kAttestKeyPrefix,
-             GetKeySlotStr(key_slot));
-    if (cert_chain_length > kMaxCertChainLength) {
-        return KM_ERROR_UNKNOWN_ERROR;
-    }
-
-    uint32_t current_cert_chain_length = 0;
-    if (ReadCertChainLength(key_slot, &current_cert_chain_length) != KM_ERROR_OK ||
-        cert_chain_length > current_cert_chain_length + 1) {
-        LOG_E("Error: Cannot increase certificate chain length by more than 1.", 0);
-        return KM_ERROR_INVALID_ARGUMENT;
-    }
-    if (!SecureStorageWrite(cert_chain_length_file.get(), &cert_chain_length, sizeof(uint32_t))) {
         return KM_ERROR_UNKNOWN_ERROR;
     }
     return KM_ERROR_OK;
@@ -378,13 +385,6 @@ keymaster_error_t DeleteCertChain(AttestationKeySlot key_slot) {
         }
     }
     if (WriteCertChainLength(key_slot, 0) != KM_ERROR_OK) {
-        return KM_ERROR_UNKNOWN_ERROR;
-    }
-    return KM_ERROR_OK;
-}
-
-keymaster_error_t WriteAttestationUuid(const uint8_t attestation_uuid[kAttestationUuidSize]) {
-    if (!SecureStorageWrite(kAttestUuidFileName, attestation_uuid, kAttestationUuidSize)) {
         return KM_ERROR_UNKNOWN_ERROR;
     }
     return KM_ERROR_OK;

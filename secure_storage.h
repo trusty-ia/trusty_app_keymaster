@@ -62,6 +62,11 @@ keymaster_error_t ReadKeyFromStorage(AttestationKeySlot key_slot, uint8_t** key,
                                      uint32_t* key_size);
 
 /**
+ * Checks if |key_slot| attestation key exists in RPMB. On success, writes to |exists|.
+ */
+keymaster_error_t AttestationKeyExists(AttestationKeySlot key_slot, bool* exists);
+
+/**
  * Writes |cert_size| bytes at |cert| to cert file associated with |key_slot| and |index|.
  * The caller can either write to an exising certificate entry, or one past the end of the
  * chain to extend the chain length by 1 (|index| = chain length). Fails when |index| >
@@ -77,10 +82,12 @@ keymaster_error_t WriteCertToStorage(AttestationKeySlot key_slot, const uint8_t*
 keymaster_error_t ReadCertChainFromStorage(AttestationKeySlot key_slot,
                                            keymaster_cert_chain_t* cert_chain);
 
-/**
- * Checks if |key_slot| attestation key exists in RPMB. On success, writes to |exists|.
+/*
+ * Writes the new length of the stored |key_slot| attestation certificate chain. If less
+ * than the existing certificate chain length, the chain is truncated. Input cannot be
+ * larger than the current certificate chain length + 1.
  */
-keymaster_error_t AttestationKeyExists(AttestationKeySlot key_slot, bool* exists);
+keymaster_error_t WriteCertChainLength(AttestationKeySlot key_slot, uint32_t cert_chain_length);
 
 /**
  * Reads the current length of the stored |key_slot| attestation certificate chain. On
@@ -89,21 +96,14 @@ keymaster_error_t AttestationKeyExists(AttestationKeySlot key_slot, bool* exists
 keymaster_error_t ReadCertChainLength(AttestationKeySlot key_slot, uint32_t* cert_chain_length);
 
 /**
- * Reads the |attestation_uuid|. If none exists, sets the uuid to all ascii zeros.
- */
-keymaster_error_t ReadAttestationUuid(uint8_t attestation_uuid[kAttestationUuidSize]);
-
-/**
  * Writes the |attestation_uuid|.
  */
 keymaster_error_t WriteAttestationUuid(const uint8_t attestation_uuid[kAttestationUuidSize]);
 
-/*
- * Writes the new length of the stored |key_slot| attestation certificate chain. If less
- * than the existing certificate chain length, the chain is truncated. Input cannot be
- * larger than the current certificate chain length + 1.
+/**
+ * Reads the |attestation_uuid|. If none exists, sets the uuid to all ascii zeros.
  */
-keymaster_error_t WriteCertChainLength(AttestationKeySlot key_slot, uint32_t cert_chain_length);
+keymaster_error_t ReadAttestationUuid(uint8_t attestation_uuid[kAttestationUuidSize]);
 
 /**
  * Deletes |key_slot| attestation key from RPMB.
