@@ -71,7 +71,8 @@ struct NoRequest : public KeymasterMessage {
 
     size_t SerializedSize() const override { return 0; }
     uint8_t* Serialize(uint8_t* buf, const uint8_t* end) const override { return buf; }
-    bool Deserialize(const uint8_t** buf_ptr, const uint8_t* end) { return true; }
+    bool Deserialize(const uint8_t** buf_ptr, const uint8_t* end) override { return true; }
+
 };
 
 struct SetBootParamsRequest : public KeymasterMessage {
@@ -163,7 +164,7 @@ struct AtapSetCaResponseBeginRequest : public KeymasterMessage {
     uint8_t* Serialize(uint8_t* buf, const uint8_t* end) const override {
         return append_uint32_to_buf(buf, end, ca_response_size);
     }
-    bool Deserialize(const uint8_t** buf_ptr, const uint8_t* end) {
+    bool Deserialize(const uint8_t** buf_ptr, const uint8_t* end) override {
         return copy_uint32_from_buf(buf_ptr, end, &ca_response_size);
     }
 
