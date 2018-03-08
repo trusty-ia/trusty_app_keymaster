@@ -23,6 +23,9 @@
 #include "attest_keybox.h"
 #include "LzmaDec.h"
 
+#include "trusty_device_info.h"
+#include "trusty_syscalls_x86.h"
+
 #define XML_KEY_ALGORITHM_EC_STRING     "ecdsa"
 #define XML_KEY_ALGORITHM_RSA_STRING    "rsa"
 
