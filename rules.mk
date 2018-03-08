@@ -77,7 +77,8 @@ MODULE_DEPS += \
 	lib/storage \
 	lib/hwkey \
 	lib/tinyxml2 \
-	lib/lzma
+	lib/lzma \
+	lib/trusty_syscall_x86
 
 include $(LOCAL_DIR)/$(IPC)/rules.mk
 
