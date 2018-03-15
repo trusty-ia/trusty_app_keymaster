@@ -15,7 +15,7 @@
  */
 
 #include "trusty_keymaster.h"
-#include <err.h>
+#include <uapi/err.h>
 
 namespace keymaster {
 
