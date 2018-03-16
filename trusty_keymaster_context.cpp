@@ -21,17 +21,19 @@ extern "C" {
 #include <lib/hwkey/hwkey.h>
 #include <lib/rng/trusty_rng.h>
 }
+#include <keymaster/logger.h>
 
 #include <keymaster/android_keymaster_utils.h>
-#include <keymaster/ec_key_factory.h>
-#include <keymaster/logger.h>
-#include <keymaster/rsa_key_factory.h>
+#include <keymaster/km_openssl/ec_key_factory.h>
+#include <keymaster/km_openssl/rsa_key_factory.h>
+#include <keymaster/km_openssl/aes_key.h>
+#include <keymaster/km_openssl/hmac_key.h>
+#include <keymaster/km_openssl/openssl_err.h>
+#include <keymaster/km_openssl/attestation_utils.h>
 
-#include "aes_key.h"
-#include "auth_encrypted_key_blob.h"
-#include "hmac_key.h"
-#include "ocb_utils.h"
-#include "openssl_err.h"
+#include <keymaster/key_blob_utils/auth_encrypted_key_blob.h>
+#include <keymaster/key_blob_utils/ocb_utils.h>
+
 #include "test_attestation_keys.h"
 
 
@@ -85,8 +87,8 @@ TrustyKeymasterContext::TrustyKeymasterContext()
     LOG_D("Creating TrustyKeymaster", 0);
     rsa_factory_.reset(new RsaKeyFactory(this));
     ec_factory_.reset(new EcKeyFactory(this));
-    aes_factory_.reset(new AesKeyFactory(this));
-    hmac_factory_.reset(new HmacKeyFactory(this));
+    aes_factory_.reset(new AesKeyFactory(this, this));
+    hmac_factory_.reset(new HmacKeyFactory(this, this));
     verified_boot_key_.Reinitialize("Unbound", 7);
 }
 
@@ -301,11 +303,8 @@ keymaster_error_t TrustyKeymasterContext::CreateKeyBlob(const AuthorizationSet& 
 keymaster_error_t TrustyKeymasterContext::UpgradeKeyBlob(const KeymasterKeyBlob& key_to_upgrade,
                                                          const AuthorizationSet& upgrade_params,
                                                          KeymasterKeyBlob* upgraded_key) const {
-    KeymasterKeyBlob key_material;
-    AuthorizationSet hw_enforced;
-    AuthorizationSet sw_enforced;
-    keymaster_error_t error =
-        ParseKeyBlob(key_to_upgrade, upgrade_params, &key_material, &hw_enforced, &sw_enforced);
+    UniquePtr<Key> key;
+    keymaster_error_t error = ParseKeyBlob(key_to_upgrade, upgrade_params, &key);
     if (error != KM_ERROR_OK)
         return error;
 
@@ -315,18 +314,18 @@ keymaster_error_t TrustyKeymasterContext::UpgradeKeyBlob(const KeymasterKeyBlob&
         // We need to allow "upgrading" OS version to zero, to support upgrading from proper
         // numbered releases to unnumbered development and preview releases.
 
-        int key_os_version_pos = sw_enforced.find(TAG_OS_VERSION);
+        int key_os_version_pos = key->sw_enforced().find(TAG_OS_VERSION);
         if (key_os_version_pos != -1) {
-            uint32_t key_os_version = sw_enforced[key_os_version_pos].integer;
+            uint32_t key_os_version = key->sw_enforced()[key_os_version_pos].integer;
             if (key_os_version != 0) {
-                sw_enforced[key_os_version_pos].integer = boot_os_version_;
+                key->sw_enforced()[key_os_version_pos].integer = boot_os_version_;
                 set_changed = true;
             }
         }
     }
 
-    if (!UpgradeIntegerTag(TAG_OS_VERSION, boot_os_version_, &hw_enforced, &set_changed) ||
-        !UpgradeIntegerTag(TAG_OS_PATCHLEVEL, boot_os_patchlevel_, &hw_enforced, &set_changed)) {
+    if (!UpgradeIntegerTag(TAG_OS_VERSION, boot_os_version_, &key->hw_enforced(), &set_changed) ||
+        !UpgradeIntegerTag(TAG_OS_PATCHLEVEL, boot_os_patchlevel_, &key->hw_enforced(), &set_changed)) {
         // One of the version fields would have been a downgrade. Not allowed.
         return KM_ERROR_INVALID_ARGUMENT;
     }
@@ -336,19 +335,35 @@ keymaster_error_t TrustyKeymasterContext::UpgradeKeyBlob(const KeymasterKeyBlob&
         return KM_ERROR_OK;
     }
 
-    return CreateAuthEncryptedKeyBlob(upgrade_params, key_material, hw_enforced, sw_enforced,
+    return CreateAuthEncryptedKeyBlob(upgrade_params, key->key_material(), key->hw_enforced(), key->sw_enforced(),
                                       upgraded_key);
 }
 
 keymaster_error_t TrustyKeymasterContext::ParseKeyBlob(const KeymasterKeyBlob& blob,
                                                        const AuthorizationSet& additional_params,
-                                                       KeymasterKeyBlob* key_material,
-                                                       AuthorizationSet* hw_enforced,
-                                                       AuthorizationSet* sw_enforced) const {
+                                                       UniquePtr<Key>* key) const {
     Buffer nonce, tag;
     KeymasterKeyBlob encrypted_key_material;
-    keymaster_error_t error = DeserializeAuthEncryptedBlob(blob, &encrypted_key_material,
-                                                           hw_enforced, sw_enforced, &nonce, &tag);
+    AuthorizationSet hw_enforced;
+    AuthorizationSet sw_enforced;
+    KeymasterKeyBlob key_material;
+    keymaster_error_t error;
+
+    auto constructKey = [&, this] () mutable -> keymaster_error_t {
+        // GetKeyFactory
+        if (error != KM_ERROR_OK) return error;
+        keymaster_algorithm_t algorithm;
+        if (!hw_enforced.GetTagValue(TAG_ALGORITHM, &algorithm) &&
+            !sw_enforced.GetTagValue(TAG_ALGORITHM, &algorithm)) {
+            return KM_ERROR_INVALID_ARGUMENT;
+        }
+        auto factory = GetKeyFactory(algorithm);
+        return factory->LoadKey(move(key_material), additional_params, move(hw_enforced),
+                             move(sw_enforced), key);
+    };
+
+    error = DeserializeAuthEncryptedBlob(blob, &encrypted_key_material,
+                                                           &hw_enforced, &sw_enforced, &nonce, &tag);
     if (error != KM_ERROR_OK)
         return error;
 
@@ -365,8 +380,12 @@ keymaster_error_t TrustyKeymasterContext::ParseKeyBlob(const KeymasterKeyBlob& b
     if (error != KM_ERROR_OK)
         return error;
 
-    return OcbDecryptKey(*hw_enforced, *sw_enforced, hidden, master_key, encrypted_key_material,
-                         nonce, tag, key_material);
+    error = OcbDecryptKey(hw_enforced, sw_enforced, hidden, master_key, encrypted_key_material,
+                         nonce, tag, &key_material);
+    if (error != KM_ERROR_OK)
+        return error;
+
+    return constructKey();
 }
 
 keymaster_error_t TrustyKeymasterContext::AddRngEntropy(const uint8_t* buf, size_t length) const {
@@ -503,8 +522,8 @@ TrustyKeymasterContext::GetVerifiedBootParams(keymaster_blob_t* verified_boot_ke
     return KM_ERROR_OK;
 }
 
-EVP_PKEY* TrustyKeymasterContext::AttestationKey(keymaster_algorithm_t algorithm,
-                                                 keymaster_error_t* error) const {
+const keymaster_key_blob_t* TrustyKeymasterContext::getAttestationKey(keymaster_algorithm_t algorithm,
+                                                 keymaster_error_t* error) const{
 
     uint8_t* key = nullptr;
     uint32_t key_size = 0;
@@ -535,6 +554,7 @@ EVP_PKEY* TrustyKeymasterContext::AttestationKey(keymaster_algorithm_t algorithm
 
     if (*error != KM_ERROR_OK)
         return nullptr;
+#if 0
     const uint8_t* const_key = key;
 
     EVP_PKEY* pkey = d2i_PrivateKey(evp_key_type, nullptr, &const_key, key_size);
@@ -542,10 +562,16 @@ EVP_PKEY* TrustyKeymasterContext::AttestationKey(keymaster_algorithm_t algorithm
         *error = TranslateLastOpenSslError();
 
     return pkey;
+#endif
+    static const keymaster_key_blob_t AttestKeyBlob = {
+        (const uint8_t*)key, key_size
+    };
+
+    return &AttestKeyBlob;
 }
 
-keymaster_cert_chain_t* TrustyKeymasterContext::AttestationChain(keymaster_algorithm_t algorithm,
-                                                                 keymaster_error_t* error) const {
+keymaster_cert_chain_t* TrustyKeymasterContext::getAttestationChain(keymaster_algorithm_t algorithm,
+                                                                 keymaster_error_t* error)  const{
 
     UniquePtr<keymaster_cert_chain_t, CertificateChainDelete> chain(new keymaster_cert_chain_t);
     if (!chain.get()) {
@@ -568,7 +594,33 @@ keymaster_cert_chain_t* TrustyKeymasterContext::AttestationChain(keymaster_algor
         return nullptr;
     return chain.release();
 }
+#if 0
+keymaster_error_t TrustyKeymasterContext::GenerateAttestation(const Key& key,
+        const AuthorizationSet& attest_params, CertChainPtr* cert_chain) const {
 
+    keymaster_error_t error = KM_ERROR_OK;
+    keymaster_algorithm_t key_algorithm;
+    if (!key.authorizations().GetTagValue(TAG_ALGORITHM, &key_algorithm)) {
+        return KM_ERROR_UNKNOWN_ERROR;
+    }
+
+    if ((key_algorithm != KM_ALGORITHM_RSA && key_algorithm != KM_ALGORITHM_EC))
+        return KM_ERROR_INCOMPATIBLE_ALGORITHM;
+
+    // We have established that the given key has the correct algorithm, and because this is the
+    // SoftKeymasterContext we can assume that the Key is an AsymmetricKey. So we can downcast.
+    const AsymmetricKey& asymmetric_key = reinterpret_cast<const AsymmetricKey&>(key);
+
+    auto attestation_chain = getAttestationChain(key_algorithm, &error);
+    if (error != KM_ERROR_OK) return error;
+
+    auto attestation_key = getAttestationKey(key_algorithm, &error);
+    if (error != KM_ERROR_OK) return error;
+
+    return generate_attestation(asymmetric_key, attest_params,
+            *attestation_chain, *attestation_key, *this, cert_chain);
+}
+#endif
 keymaster_error_t TrustyKeymasterContext::SetBootParams(
     uint32_t os_version, uint32_t os_patchlevel, const Buffer& verified_boot_key,
     keymaster_verified_boot_t verified_boot_state, bool device_locked) {
