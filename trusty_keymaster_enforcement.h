@@ -43,11 +43,32 @@ class TrustyKeymasterEnforcement : public KeymasterEnforcement {
     }
 
     bool auth_token_timed_out(const hw_auth_token_t& token, uint32_t timeout) const override;
-    uint32_t get_current_time() const override;
+    uint64_t get_current_time_ms() const override;
     bool ValidateTokenSignature(const hw_auth_token_t& token) const override;
+
+    keymaster_security_level_t SecurityLevel() const override {
+        return KM_SECURITY_LEVEL_TRUSTED_ENVIRONMENT; 
+    }
+
+    bool CreateKeyId(const keymaster_key_blob_t& key_blob, km_id_t* keyid) const override;
+
+    keymaster_error_t GetHmacSharingParameters(HmacSharingParameters* params) override;
+
+    keymaster_error_t ComputeSharedHmac(const HmacSharingParametersArray& params_array,
+                                      KeymasterBlob* sharingCheck) override {
+        return KM_ERROR_UNIMPLEMENTED;
+    }
+
+    VerifyAuthorizationResponse VerifyAuthorization(const VerifyAuthorizationRequest& request) override {
+        VerifyAuthorizationResponse response;  //KM_ERROR_UNIMPLEMENTED
+        return response;
+    }
 
   private:
     uint64_t milliseconds_since_boot() const;
+    bool have_saved_params_ = false;
+    HmacSharingParameters saved_params_;
+    KeymasterKeyBlob hmac_key_;
 
     TrustyKeymasterContext* context_;
 };
