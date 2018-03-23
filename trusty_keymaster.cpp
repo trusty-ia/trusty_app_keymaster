@@ -221,4 +221,18 @@ void TrustyKeymaster::AtapSetCaResponseFinish(const AtapSetCaResponseFinishReque
 #endif
 }
 
+void TrustyKeymaster::AtapReadUuid(const AtapReadUuidRequest& request,
+                                   AtapReadUuidResponse* response) {
+    if (response == nullptr)
+        return;
+
+    uint8_t uuid[kAttestationUuidSize];
+    response->error = ReadAttestationUuid(uuid);
+
+    if (response->error == KM_ERROR_OK) {
+        response->data.reserve(kAttestationUuidSize);
+        response->data.write(uuid, kAttestationUuidSize);
+    }
+}
+
 }  // namespace keymaster

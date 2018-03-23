@@ -171,10 +171,15 @@ struct AtapSetCaResponseBeginRequest : public KeymasterMessage {
     uint32_t ca_response_size;
 };
 struct AtapSetCaResponseBeginResponse : public NoResponse {};
+
 struct AtapSetCaResponseUpdateRequest : public RawBufferRequest {};
 struct AtapSetCaResponseUpdateResponse : public NoResponse {};
+
 struct AtapSetCaResponseFinishRequest : public NoRequest {};
 struct AtapSetCaResponseFinishResponse : public NoResponse {};
+
+struct AtapReadUuidRequest : public NoRequest {};
+struct AtapReadUuidResponse : public RawBufferResponse {};
 
 }  // namespace keymaster
 

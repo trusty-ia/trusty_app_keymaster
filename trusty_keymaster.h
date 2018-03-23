@@ -75,6 +75,9 @@ class TrustyKeymaster : public AndroidKeymaster {
     void AtapSetCaResponseFinish(const AtapSetCaResponseFinishRequest& request,
                                  AtapSetCaResponseFinishResponse* response);
 
+    // Reads the UUID from the certificate of the last provisioned attestation credentials.
+    void AtapReadUuid(const AtapReadUuidRequest& request, AtapReadUuidResponse* response);
+
     bool ConfigureCalled() { return configure_error_ != KM_ERROR_KEYMASTER_NOT_CONFIGURED; }
     keymaster_error_t get_configure_error() { return configure_error_; }
     void set_configure_error(keymaster_error_t err) { configure_error_ = err; }

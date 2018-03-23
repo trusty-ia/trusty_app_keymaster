@@ -234,7 +234,7 @@ static bool cmd_is_from_bootloader(uint32_t cmd) {
     return (cmd == KM_SET_BOOT_PARAMS || cmd == KM_SET_ATTESTATION_KEY ||
             cmd == KM_APPEND_ATTESTATION_CERT_CHAIN || cmd == KM_ATAP_GET_CA_REQUEST ||
             cmd == KM_ATAP_SET_CA_RESPONSE_BEGIN || cmd == KM_ATAP_SET_CA_RESPONSE_UPDATE ||
-            cmd == KM_ATAP_SET_CA_RESPONSE_FINISH);
+            cmd == KM_ATAP_SET_CA_RESPONSE_FINISH || cmd == KM_ATAP_READ_UUID);
 }
 
 // Returns true if |cmd| can be used before the configure command
@@ -374,6 +374,10 @@ static long keymaster_dispatch_non_secure(keymaster_chan_ctx* ctx, keymaster_mes
         LOG_D("Dispatching KM_ATAP_SET_CA_RESPONSE_FINISH, size %d", payload_size);
         return do_dispatch(&TrustyKeymaster::AtapSetCaResponseFinish, msg, payload_size, out,
                            out_size);
+
+    case KM_ATAP_READ_UUID:
+        LOG_D("Dispatching KM_ATAP_READ_UUID, size %d", payload_size);
+        return do_dispatch(&TrustyKeymaster::AtapReadUuid, msg, payload_size, out, out_size);
 
     default:
         LOG_E("Cannot dispatch unknown command %d", msg->cmd);

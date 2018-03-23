@@ -350,7 +350,7 @@ keymaster_error_t ReadAttestationUuid(uint8_t attestation_uuid[kAttestationUuidS
         return KM_ERROR_UNKNOWN_ERROR;
     }
     if (size < kAttestationUuidSize) {
-        memset(attestation_uuid, '0', kAttestationUuidSize);
+        memset(attestation_uuid, '\0', kAttestationUuidSize);
         return KM_ERROR_OK;
     }
     if (!SecureStorageRead(kAttestUuidFileName, attestation_uuid, kAttestationUuidSize)) {
