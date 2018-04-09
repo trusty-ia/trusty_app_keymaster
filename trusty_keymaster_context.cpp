@@ -523,7 +523,6 @@ EVP_PKEY* TrustyKeymasterContext::AttestationKey(keymaster_algorithm_t algorithm
         return nullptr;
     }
 
-#if 0 //  TODO: It will blocked in ReadKeyFromStorage() if RPMB is not enabled
     *error = ReadKeyFromStorage(algorithm, &key, &key_size);
     if (*error == KM_ERROR_OK) {
         key_deleter.reset(key);
@@ -531,9 +530,6 @@ EVP_PKEY* TrustyKeymasterContext::AttestationKey(keymaster_algorithm_t algorithm
         LOG_E("Failed to read attestation key from RPMB, falling back to test key", 0);
         *error = GetSoftwareAttestationKey(algorithm, &key, &key_size);
     }
-#endif
-	LOG_E("Failed to read attestation key from RPMB, falling back to test key", 0);
-	*error = GetSoftwareAttestationKey(algorithm, &key, &key_size);
 
     if (*error != KM_ERROR_OK)
         return nullptr;
@@ -560,15 +556,11 @@ keymaster_cert_chain_t* TrustyKeymasterContext::AttestationChain(keymaster_algor
     }
     memset(chain.get(), 0, sizeof(keymaster_cert_chain_t));
 
-#if 0 //  TODO: It will blocked in ReadCertChainFromStorage() if RPMB is not enabled
     *error = ReadCertChainFromStorage(algorithm, chain.get());
     if (*error != KM_ERROR_OK) {
         LOG_E("Failed to read attestation chain from RPMB, falling back to test chain", 0);
         *error = GetSoftwareAttestationChain(algorithm, chain.get());
     }
-#endif
-	LOG_E("Failed to read attestation chain from RPMB, falling back to test chain", 0);
-	*error = GetSoftwareAttestationChain(algorithm, chain.get());
 
     if (*error != KM_ERROR_OK)
         return nullptr;
