@@ -64,8 +64,11 @@ MODULE_INCLUDES := \
 	$(LOCAL_DIR) \
 	$(ANDROID_ROOT)/hardware/libhardware/include
 
-MODULE_CPPFLAGS := -std=c++11 \
-	-mpreferred-stack-boundary=5 -mstackrealign -fno-short-enums
+MODULE_CPPFLAGS := -std=c++11
+
+ifeq ($(call TOBOOL,$(CLANGBUILD)), false)
+MODULE_CPPFLAGS += -mpreferred-stack-boundary=5 -mstackrealign -fno-short-enums
+endif
 
 IPC := ipc
 
