@@ -40,6 +40,7 @@ const char* kAttestKeyPrefix = "AttestKey.";
 const char* kAttestCertPrefix = "AttestCert.";
 
 const char* kAttestUuidFileName = "AttestUuid";
+const char* kProductIdFileName = "ProductId";
 
 // Maximum file name size.
 static const int kStorageIdLengthMax = 64;
@@ -408,6 +409,44 @@ keymaster_error_t DeleteCertChain(AttestationKeySlot key_slot) {
         }
     }
     if (WriteCertChainLength(key_slot, 0) != KM_ERROR_OK) {
+        return KM_ERROR_UNKNOWN_ERROR;
+    }
+    return KM_ERROR_OK;
+}
+
+keymaster_error_t SetProductId(const uint8_t product_id[kProductIdSize]) {
+    uint64_t product_id_size;
+    if (!SecureStorageGetFileSize(kProductIdFileName, &product_id_size)) {
+        return KM_ERROR_UNKNOWN_ERROR;
+    }
+#ifndef KEYMASTER_DEBUG
+    if (product_id_size != 0) {
+        LOG_E("Error: Product ID already set!\n", 0);
+        return KM_ERROR_INVALID_ARGUMENT;
+    }
+#endif /* KEYMASTER_DEBUG */
+    if (!SecureStorageWrite(kProductIdFileName, product_id, kProductIdSize)) {
+        return KM_ERROR_UNKNOWN_ERROR;
+    }
+    return KM_ERROR_OK;
+}
+
+keymaster_error_t ReadProductId(uint8_t product_id[kProductIdSize]) {
+    uint64_t product_id_size;
+    if (!SecureStorageGetFileSize(kProductIdFileName, &product_id_size) ||
+        product_id_size != kProductIdSize) {
+        return KM_ERROR_UNKNOWN_ERROR;
+    }
+
+    if (!SecureStorageRead(kProductIdFileName, product_id, kProductIdSize)) {
+        return KM_ERROR_UNKNOWN_ERROR;
+    }
+
+    return KM_ERROR_OK;
+}
+
+keymaster_error_t DeleteProductId() {
+    if (!SecureStorageDeleteFile(kProductIdFileName)) {
         return KM_ERROR_UNKNOWN_ERROR;
     }
     return KM_ERROR_OK;

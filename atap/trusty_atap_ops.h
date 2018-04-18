@@ -38,9 +38,6 @@ public:
     TrustyAtapOps();
     ~TrustyAtapOps() override;
 
-    // The ID set here will be passed through to read_product_id().
-    void set_product_id(uint8_t product_id[ATAP_PRODUCT_ID_LEN]);
-
     // AtapOpsDelegate methods. Other methods are handled by OpensslOps.
     AtapResult read_product_id(
             uint8_t product_id[ATAP_PRODUCT_ID_LEN]) override;
@@ -70,7 +67,6 @@ public:
 private:
     bool _auth_key_type_init = false;
     AtapKeyType _auth_key_type;
-    uint8_t product_id_[ATAP_PRODUCT_ID_LEN]{};
 };
 
 }  // namespace keymaster

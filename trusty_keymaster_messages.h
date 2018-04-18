@@ -205,6 +205,8 @@ struct AtapSetCaResponseUpdateResponse : public NoResponse {};
 
 struct AtapSetCaResponseFinishRequest : public NoRequest {};
 struct AtapSetCaResponseFinishResponse : public NoResponse {};
+struct AtapSetProductIdRequest : public RawBufferRequest {};
+struct AtapSetProductIdResponse : public NoResponse {};
 
 struct AtapReadUuidRequest : public NoRequest {};
 struct AtapReadUuidResponse : public RawBufferResponse {};

@@ -98,13 +98,14 @@ typedef UniquePtr<EVP_MD_CTX, EVP_MD_CTX_Delete> Unique_EVP_MD_CTX;
 TrustyAtapOps::TrustyAtapOps() {}
 TrustyAtapOps::~TrustyAtapOps() {}
 
-void TrustyAtapOps::set_product_id(uint8_t product_id[ATAP_PRODUCT_ID_LEN]) {
-    memcpy(product_id_, product_id, ATAP_PRODUCT_ID_LEN);
-}
-
 AtapResult TrustyAtapOps::read_product_id(
         uint8_t product_id[ATAP_PRODUCT_ID_LEN]) {
-    memcpy(product_id, product_id_, ATAP_PRODUCT_ID_LEN);
+    if (ReadProductId(product_id) != KM_ERROR_OK) {
+        /* If we can't get permanent attributes, set product id to the test
+        product id (all zero). */
+        LOG_E("Fail to read product id from storage, set as 0.", 0);
+        memset(product_id, 0, ATAP_PRODUCT_ID_LEN);
+    }
     return ATAP_RESULT_OK;
 }
 

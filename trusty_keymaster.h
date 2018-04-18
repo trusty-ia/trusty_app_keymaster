@@ -87,6 +87,12 @@ public:
     void AtapReadUuid(const AtapReadUuidRequest& request,
                       AtapReadUuidResponse* response);
 
+    // SetProductId is only called once to set the secure product id. Caller
+    // should read the product id from permanent attributes structure and set
+    // the product id while fusing the permanent attributes.
+    void AtapSetProductId(const AtapSetProductIdRequest& request,
+                          AtapSetProductIdResponse* response);
+
     bool ConfigureCalled() {
         return configure_error_ != KM_ERROR_KEYMASTER_NOT_CONFIGURED;
     }

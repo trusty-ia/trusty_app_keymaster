@@ -122,6 +122,21 @@ keymaster_error_t ReadAttestationUuid(
         uint8_t attestation_uuid[kAttestationUuidSize]);
 
 /**
+ * Read the |product_id|. If none exists, sets it to all zeros.
+ */
+keymaster_error_t ReadProductId(uint8_t product_id[kProductIdSize]);
+
+/**
+ * Set the |product_id|.
+ */
+keymaster_error_t SetProductId(const uint8_t product_id[kProductIdSize]);
+
+/**
+ * Delete the |product_id|.
+ */
+keymaster_error_t DeleteProductId();
+
+/**
  * Deletes |key_slot| attestation key from RPMB.
  */
 keymaster_error_t DeleteKey(AttestationKeySlot key_slot);

@@ -20,7 +20,10 @@
  * once an RPMB proxy becomes available.
  *
  * *** IMPORTANT ***
- * This test will delete all existing attestation data stored in RPMB.
+ * This test will delete all existing attestation data stored in RPMB. It would
+ * also delete the product id stored in RPMB. Don't run this test on a permanent
+ * attribute fused device since this test would put the device into an
+ * inconsistent state.
  */
 
 #include <assert.h>
@@ -63,7 +66,11 @@
 using keymaster::AttestationKeySlot;
 using keymaster::CertificateChainDelete;
 using keymaster::DeleteAllAttestationData;
+using keymaster::DeleteProductId;
 using keymaster::KeymasterKeyBlob;
+using keymaster::kProductIdSize;
+using keymaster::ReadProductId;
+using keymaster::SetProductId;
 
 uint8_t* NewRandBuf(uint32_t size) {
     UniquePtr<uint8_t[]> buf(new uint8_t[size]);
@@ -200,6 +207,69 @@ test_abort:
     TEST_END;
 }
 
+void TestProductIdStorage() {
+    keymaster_error_t error = KM_ERROR_OK;
+    UniquePtr<uint8_t[]> write_productid;
+    UniquePtr<uint8_t[]> read_productid(new uint8_t[kProductIdSize]);
+
+    TEST_BEGIN(__func__);
+
+    error = DeleteProductId();
+    ASSERT_EQ(KM_ERROR_OK, error);
+
+    write_productid.reset(NewRandBuf(kProductIdSize));
+    ASSERT_NE(nullptr, write_productid.get());
+
+    error = SetProductId((const uint8_t*)write_productid.get());
+    ASSERT_EQ(KM_ERROR_OK, error);
+
+    error = ReadProductId(read_productid.get());
+    ASSERT_EQ(KM_ERROR_OK, error);
+    ASSERT_NE(nullptr, read_productid.get());
+    ASSERT_EQ(0, memcmp(write_productid.get(), read_productid.get(),
+                        kProductIdSize));
+
+    error = DeleteProductId();
+    ASSERT_EQ(KM_ERROR_OK, error);
+
+test_abort:
+    TEST_END;
+}
+
+void TestProductIdStoragePreventOverwrite() {
+    keymaster_error_t error = KM_ERROR_OK;
+    UniquePtr<uint8_t[]> write_productid;
+    UniquePtr<uint8_t[]> overwrite_productid;
+    UniquePtr<uint8_t[]> read_productid(new uint8_t[kProductIdSize]);
+
+    TEST_BEGIN(__func__);
+
+    error = DeleteProductId();
+    ASSERT_EQ(KM_ERROR_OK, error);
+
+    write_productid.reset(NewRandBuf(kProductIdSize));
+    ASSERT_NE(nullptr, write_productid.get());
+
+    error = SetProductId((const uint8_t*)write_productid.get());
+    ASSERT_EQ(KM_ERROR_OK, error);
+
+    overwrite_productid.reset(NewRandBuf(kProductIdSize));
+    error = SetProductId((const uint8_t*)write_productid.get());
+    ASSERT_EQ(KM_ERROR_INVALID_ARGUMENT, error);
+
+    error = ReadProductId(read_productid.get());
+    ASSERT_EQ(KM_ERROR_OK, error);
+    ASSERT_NE(nullptr, read_productid.get());
+    ASSERT_EQ(0, memcmp(write_productid.get(), read_productid.get(),
+                        kProductIdSize));
+
+    error = DeleteProductId();
+    ASSERT_EQ(KM_ERROR_OK, error);
+
+test_abort:
+    TEST_END;
+}
+
 int main(void) {
 
     TLOGI("km_storage_test: running all\n");
@@ -217,7 +287,14 @@ int main(void) {
 
     TestCertStorageInvalid(AttestationKeySlot::kRsa);
 
+    TestProductIdStorage();
+
+#ifndef KEYMASTER_DEBUG
+    TestProductIdStoragePreventOverwrite();
+#endif
+
     DeleteAttestationData();
 
     TLOGI("km_storage_test: complete!\n");
+    return 0;
 }

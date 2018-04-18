@@ -241,4 +241,24 @@ void TrustyKeymaster::AtapReadUuid(const AtapReadUuidRequest& request,
     }
 }
 
+void TrustyKeymaster::AtapSetProductId(const AtapSetProductIdRequest& request,
+                                       AtapSetProductIdResponse* response) {
+    if (response == nullptr)
+        return;
+
+#ifdef DISABLE_ATAP_SUPPORT
+    // Not implemented.
+    response->error = KM_ERROR_UNKNOWN_ERROR;
+    return;
+#else
+    response->error = KM_ERROR_UNKNOWN_ERROR;
+    const Buffer& product_id = request.data;
+    uint32_t product_id_size = product_id.available_read();
+    if (product_id_size != kProductIdSize) {
+        response->error = KM_ERROR_INVALID_INPUT_LENGTH;
+        return;
+    }
+    response->error = SetProductId(product_id.begin());
+#endif
+}
 }  // namespace keymaster
