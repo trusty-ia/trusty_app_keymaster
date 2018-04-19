@@ -189,19 +189,18 @@ keymaster_error_t WriteKeyToStorage(AttestationKeySlot key_slot,
                                     const uint8_t* key,
                                     uint32_t key_size) {
     UniquePtr<char[]> key_file(new char[kStorageIdLengthMax]);
-
     snprintf(key_file.get(), kStorageIdLengthMax, "%s.%s", kAttestKeyPrefix,
              GetKeySlotStr(key_slot));
     if (!SecureStorageWrite(key_file.get(), key, key_size)) {
         return KM_ERROR_UNKNOWN_ERROR;
     }
+
     return KM_ERROR_OK;
 }
 
 KeymasterKeyBlob ReadKeyFromStorage(AttestationKeySlot key_slot,
                                     keymaster_error_t* error) {
     UniquePtr<char[]> key_file(new char[kStorageIdLengthMax]);
-
     snprintf(key_file.get(), kStorageIdLengthMax, "%s.%s", kAttestKeyPrefix,
              GetKeySlotStr(key_slot));
 
@@ -233,7 +232,6 @@ KeymasterKeyBlob ReadKeyFromStorage(AttestationKeySlot key_slot,
 keymaster_error_t AttestationKeyExists(AttestationKeySlot key_slot,
                                        bool* exists) {
     UniquePtr<char[]> key_file(new char[kStorageIdLengthMax]);
-
     snprintf(key_file.get(), kStorageIdLengthMax, "%s.%s", kAttestKeyPrefix,
              GetKeySlotStr(key_slot));
     uint64_t size;
@@ -249,7 +247,6 @@ keymaster_error_t WriteCertToStorage(AttestationKeySlot key_slot,
                                      uint32_t cert_size,
                                      uint32_t index) {
     UniquePtr<char[]> cert_file(new char[kStorageIdLengthMax]);
-
     uint32_t cert_chain_length;
     bool update_cert_chain_length = false;
     if (ReadCertChainLength(key_slot, &cert_chain_length) != KM_ERROR_OK) {
@@ -293,7 +290,7 @@ keymaster_error_t ReadCertChainFromStorage(AttestationKeySlot key_slot,
            sizeof(cert_chain->entries[0]) * cert_chain_length);
 
     // Read |cert_chain_length| certs from storage
-    for (size_t i = 0; i < cert_chain_length; ++i) {
+    for (size_t i = 0; i < cert_chain_length; i++) {
         snprintf(cert_file.get(), kStorageIdLengthMax, "%s.%s.%d",
                  kAttestCertPrefix, GetKeySlotStr(key_slot), i);
         if (!SecureStorageGetFileSize(cert_file.get(), &cert_size) ||
@@ -388,7 +385,6 @@ keymaster_error_t ReadAttestationUuid(
 
 keymaster_error_t DeleteKey(AttestationKeySlot key_slot) {
     UniquePtr<char[]> key_file(new char[kStorageIdLengthMax]);
-
     snprintf(key_file.get(), kStorageIdLengthMax, "%s.%s", kAttestKeyPrefix,
              GetKeySlotStr(key_slot));
     if (!SecureStorageDeleteFile(key_file.get())) {

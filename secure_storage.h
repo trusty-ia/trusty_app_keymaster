@@ -46,7 +46,9 @@ enum class AttestationKeySlot {
 
 /* The uuid size matches, by design, ATAP_HEX_UUID_LEN in
  * system/iot/attestation/atap. */
-const size_t kAttestationUuidSize = 32;
+static const size_t kAttestationUuidSize = 32;
+/* ATAP_PRODUCT_ID_LEN in system/iot/attestation/atap. */
+static const size_t kProductIdSize = 16;
 
 /**
  * These functions implement key and certificate chain storage on top Trusty's

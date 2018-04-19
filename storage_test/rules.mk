@@ -17,18 +17,22 @@ LOCAL_DIR := $(GET_LOCAL_DIR)
 
 MODULE := $(LOCAL_DIR)
 
-KEYMASTER_ROOT := $(LOCAL_DIR)/../../../system/keymaster
+KEYMASTER_ROOT := system/keymaster
 
 MODULE_SRCS += \
     $(LOCAL_DIR)/manifest.c \
     $(LOCAL_DIR)/main.cpp \
     $(LOCAL_DIR)/../secure_storage.cpp \
-    $(KEYMASTER_ROOT)/logger.cpp
+    $(KEYMASTER_ROOT)/android_keymaster/logger.cpp
 
 MODULE_DEPS += \
     trusty/user/base/lib/libc-trusty \
     trusty/user/base/lib/libstdc++-trusty \
     trusty/user/base/lib/rng \
     trusty/user/base/lib/storage \
+
+ MODULE_INCLUDES += \
+    hardware/libhardware/include \
+    $(KEYMASTER_ROOT)/include \
 
 include make/module.mk

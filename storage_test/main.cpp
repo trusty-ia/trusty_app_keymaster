@@ -63,6 +63,7 @@
 using keymaster::AttestationKeySlot;
 using keymaster::CertificateChainDelete;
 using keymaster::DeleteAllAttestationData;
+using keymaster::KeymasterKeyBlob;
 
 uint8_t* NewRandBuf(uint32_t size) {
     UniquePtr<uint8_t[]> buf(new uint8_t[size]);
@@ -78,9 +79,7 @@ uint8_t* NewRandBuf(uint32_t size) {
 void TestKeyStorage(AttestationKeySlot key_slot) {
     keymaster_error_t error = KM_ERROR_OK;
     UniquePtr<uint8_t[]> write_key;
-    UniquePtr<uint8_t[]> read_key_deleter;
-    uint8_t* read_key = nullptr;
-    uint32_t read_size = 0;
+    KeymasterKeyBlob key_blob;
     bool key_exists = false;
 
     TEST_BEGIN(__func__);
@@ -91,12 +90,11 @@ void TestKeyStorage(AttestationKeySlot key_slot) {
     error = WriteKeyToStorage(key_slot, write_key.get(), DATA_SIZE);
     ASSERT_EQ(KM_ERROR_OK, error);
 
-    error = ReadKeyFromStorage(key_slot, &read_key, &read_size);
+    key_blob = ReadKeyFromStorage(key_slot, &error);
     ASSERT_EQ(KM_ERROR_OK, error);
-    ASSERT_EQ(DATA_SIZE, read_size);
-    ASSERT_NE(nullptr, read_key);
-    ASSERT_EQ(0, memcmp(write_key.get(), read_key, DATA_SIZE));
-    read_key_deleter.reset(read_key);
+    ASSERT_EQ(DATA_SIZE, key_blob.key_material_size);
+    ASSERT_NE(nullptr, key_blob.key_material);
+    ASSERT_EQ(0, memcmp(write_key.get(), key_blob.key_material, DATA_SIZE));
 
     error = AttestationKeyExists(AttestationKeySlot::kRsa, &key_exists);
     ASSERT_EQ(KM_ERROR_OK, error);
@@ -203,8 +201,6 @@ test_abort:
 }
 
 int main(void) {
-    int rc;
-    storage_session_t session;
 
     TLOGI("km_storage_test: running all\n");
 

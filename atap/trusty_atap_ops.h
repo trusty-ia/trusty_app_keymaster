@@ -68,6 +68,8 @@ public:
                              uint32_t* sig_len) override;
 
 private:
+    bool _auth_key_type_init = false;
+    AtapKeyType _auth_key_type;
     uint8_t product_id_[ATAP_PRODUCT_ID_LEN]{};
 };
 
