@@ -39,7 +39,7 @@ struct NoResponse : public KeymasterResponse {
 
     size_t NonErrorSerializedSize() const override { return 0; }
     uint8_t* NonErrorSerialize(uint8_t* buf, const uint8_t* end) const override { return buf; }
-    bool NonErrorDeserialize(const uint8_t** buf_ptr, const uint8_t* end) { return true; }
+    bool NonErrorDeserialize(const uint8_t** buf_ptr, const uint8_t* end) override { return true; }
 };
 
 struct SetBootParamsRequest : public KeymasterMessage {
@@ -56,7 +56,7 @@ struct SetBootParamsRequest : public KeymasterMessage {
         buf = append_uint32_to_buf(buf, end, verified_boot_state);
         return verified_boot_key.Serialize(buf, end);
     }
-    bool Deserialize(const uint8_t** buf_ptr, const uint8_t* end) {
+    bool Deserialize(const uint8_t** buf_ptr, const uint8_t* end) override {
         return copy_uint32_from_buf(buf_ptr, end, &os_version) &&
                copy_uint32_from_buf(buf_ptr, end, &os_patchlevel) &&
                copy_uint32_from_buf(buf_ptr, end, &device_locked) &&
@@ -81,7 +81,7 @@ struct SetAttestationKeyRequest : public KeymasterMessage {
         buf = append_uint32_to_buf(buf, end, algorithm);
         return key_data.Serialize(buf, end);
     }
-    bool Deserialize(const uint8_t** buf_ptr, const uint8_t* end) {
+    bool Deserialize(const uint8_t** buf_ptr, const uint8_t* end) override {
         return copy_uint32_from_buf(buf_ptr, end, &algorithm) && key_data.Deserialize(buf_ptr, end);
     }
 
@@ -102,7 +102,7 @@ struct AppendAttestationCertChainRequest : public KeymasterMessage {
         buf = append_uint32_to_buf(buf, end, algorithm);
         return cert_data.Serialize(buf, end);
     }
-    bool Deserialize(const uint8_t** buf_ptr, const uint8_t* end) {
+    bool Deserialize(const uint8_t** buf_ptr, const uint8_t* end) override {
         return copy_uint32_from_buf(buf_ptr, end, &algorithm) &&
                cert_data.Deserialize(buf_ptr, end);
     }
@@ -124,7 +124,7 @@ struct ProvsionAttesationKeyboxRequest : public KeymasterMessage {
     uint8_t* Serialize(uint8_t* buf, const uint8_t* end) const override {
         return keybox_data.Serialize(buf, end);
     }
-    bool Deserialize(const uint8_t** buf_ptr, const uint8_t* end) {
+    bool Deserialize(const uint8_t** buf_ptr, const uint8_t* end) override {
         return keybox_data.Deserialize(buf_ptr, end);
     }
 
