@@ -220,7 +220,7 @@ keymaster_error_t get_prikey_from_keybox(XMLElement* xml_root,
     uint8_t *decodedata;
     char *p, *pstart, *pend;
     char *text;
-    uint32_t count;
+    size_t count;
 
     if ((key == NULL) || (key_size == NULL))
         return KM_ERROR_INVALID_ARGUMENT;
@@ -343,7 +343,7 @@ keymaster_error_t get_cert_from_keybox(XMLElement* xml_root,
     uint8_t *decodedata;
     char *p, *pstart, *pend;
     char *text;
-    uint32_t count;
+    size_t count;
 
     if ((cert == NULL) || (cert_size == NULL))
         return KM_ERROR_INVALID_ARGUMENT;
