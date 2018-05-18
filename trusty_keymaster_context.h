@@ -88,7 +88,7 @@ class TrustyKeymasterContext : public KeymasterContext {
         return KM_ERROR_UNIMPLEMENTED;
     }
 
-    keymaster_error_t SetBootParams(uint32_t os_version, uint32_t os_patchlevel,
+    keymaster_error_t SetBootParams(uint32_t /* os_version */, uint32_t /* os_patchlevel */,
                                     const Buffer& verified_boot_key,
                                     keymaster_verified_boot_t verified_boot_state,
                                     bool device_locked, const Buffer& verified_boot_hash);
@@ -130,7 +130,8 @@ class TrustyKeymasterContext : public KeymasterContext {
     uint8_t auth_token_key_[kAuthTokenKeySize];
     bool auth_token_key_initialized_;
 
-    bool boot_params_set_ = false;
+    bool root_of_trust_set_ = false;
+    bool version_info_set_ = false;
     uint32_t boot_os_version_ = 0;
     uint32_t boot_os_patchlevel_ = 0;
     Buffer verified_boot_key_;

@@ -459,12 +459,15 @@ keymaster_error_t TrustyKeymasterContext::GetAuthTokenKey(keymaster_key_blob_t* 
 
 keymaster_error_t TrustyKeymasterContext::SetSystemVersion(uint32_t os_version,
                                                            uint32_t os_patchlevel) {
-#ifndef KEYMASTER_DEBUG
-    if (!boot_params_set_ || boot_os_version_ != os_version ||
-        boot_os_patchlevel_ != os_patchlevel) {
-        return KM_ERROR_INVALID_ARGUMENT;
+    if (!version_info_set_) {
+        // Note that version info is now set by Configure, rather than by the bootloader.  This is
+        // to ensure that system-only updates can be done, to avoid breaking Project Treble.
+        boot_os_version_ = os_version;
+        boot_os_patchlevel_ = os_patchlevel;
+        version_info_set_ = true;
     }
-#else
+
+#ifdef KEYMASTER_DEBUG
     Buffer fake_root_of_trust("000111222333444555666777888999000", 32);
     Buffer verified_boot_hash_none;
     if (!boot_params_set_) {
@@ -570,23 +573,25 @@ keymaster_cert_chain_t* TrustyKeymasterContext::AttestationChain(keymaster_algor
 }
 
 keymaster_error_t
-TrustyKeymasterContext::SetBootParams(uint32_t os_version, uint32_t os_patchlevel,
+TrustyKeymasterContext::SetBootParams(uint32_t /* os_version */, uint32_t /* os_patchlevel */,
                                       const Buffer& verified_boot_key,
                                       keymaster_verified_boot_t verified_boot_state,
                                       bool device_locked, const Buffer& verified_boot_hash) {
-    if (boot_params_set_)
+    if (root_of_trust_set_)
         return KM_ERROR_ROOT_OF_TRUST_ALREADY_SET;
-    boot_params_set_ = true;
-    boot_os_version_ = os_version;
-    boot_os_patchlevel_ = os_patchlevel;
-    verified_boot_hash_.Reinitialize(verified_boot_hash);
 
-    // If no verified boot key hash is passed, then verified boot state is considered
-    // unverified and unlocked.
+    verified_boot_hash_.Reinitialize(verified_boot_hash);
+    root_of_trust_set_ = true;
+
     if (verified_boot_key.buffer_size()) {
         verified_boot_key_.Reinitialize(verified_boot_key);
         verified_boot_state_ = verified_boot_state;
         device_locked_ = device_locked;
+    } else {
+        // If no verified boot key hash is passed, then verified boot state is considered
+        // unverified and unlocked.
+        verified_boot_state_ =  KM_VERIFIED_BOOT_UNVERIFIED;
+        device_locked_ = false;
     }
     return KM_ERROR_OK;
 }
