@@ -527,9 +527,10 @@ const keymaster_key_blob_t* TrustyKeymasterContext::getAttestationKey(keymaster_
 
     uint8_t* key = nullptr;
     uint32_t key_size = 0;
-    int evp_key_type;
     UniquePtr<uint8_t[]> key_deleter;
 
+#if 0
+    int evp_key_type;
     switch (algorithm) {
     case KM_ALGORITHM_RSA:
         evp_key_type = EVP_PKEY_RSA;
@@ -543,6 +544,7 @@ const keymaster_key_blob_t* TrustyKeymasterContext::getAttestationKey(keymaster_
         *error = KM_ERROR_UNSUPPORTED_ALGORITHM;
         return nullptr;
     }
+#endif
 
     *error = ReadKeyFromStorage(algorithm, &key, &key_size);
     if (*error == KM_ERROR_OK) {
