@@ -24,7 +24,7 @@ trusty_app_manifest_t TRUSTY_APP_MANIFEST_ATTRS trusty_app_manifest =
 	.config_options =
 	{
 		/* openssl need a larger heap */
-		TRUSTY_APP_CONFIG_MIN_HEAP_SIZE(64 * 4096),
+		TRUSTY_APP_CONFIG_MIN_HEAP_SIZE(24 * 4096),
 
 		/* openssl need a larger stack */
 		TRUSTY_APP_CONFIG_MIN_STACK_SIZE(8 * 4096),
