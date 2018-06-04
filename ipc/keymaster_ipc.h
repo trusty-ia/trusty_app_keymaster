@@ -18,7 +18,7 @@
 #pragma once
 
 #define KEYMASTER_PORT "com.android.trusty.keymaster"
-#define KEYMASTER_MAX_BUFFER_LENGTH (68*1024)
+#define KEYMASTER_MAX_BUFFER_LENGTH 4096
 
 // Commands
 enum keymaster_command {
