@@ -184,8 +184,6 @@ keymaster_error_t get_prikey_from_keybox(XMLElement* xml_root,
             return KM_ERROR_UNKNOWN_ERROR;
         }
         text = (char *)element->GetText();
-        if (text == NULL)
-            return KM_ERROR_UNKNOWN_ERROR;
         count = strlen(text);
         if ((p = strstr(text, "-----BEGIN RSA PRIVATE KEY-----")) == NULL) {
             return KM_ERROR_UNKNOWN_ERROR;
@@ -208,8 +206,6 @@ keymaster_error_t get_prikey_from_keybox(XMLElement* xml_root,
             return KM_ERROR_UNKNOWN_ERROR;
         }
         text = (char *)element->GetText();
-        if (text == NULL)
-            return KM_ERROR_UNKNOWN_ERROR;
         count = strlen(text);
         if ((p = strstr(text, "-----BEGIN EC PRIVATE KEY-----")) == NULL) {
             return KM_ERROR_UNKNOWN_ERROR;
@@ -328,8 +324,6 @@ keymaster_error_t get_cert_from_keybox(XMLElement* xml_root,
         return KM_ERROR_UNKNOWN_ERROR;
     }
     text = (char *)element->GetText();
-    if (text == NULL)
-        return KM_ERROR_UNKNOWN_ERROR;
     count = strlen(text);
     if ((p = strstr(text, "-----BEGIN CERTIFICATE-----")) == NULL) {
         return KM_ERROR_UNKNOWN_ERROR;
