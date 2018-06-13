@@ -17,10 +17,8 @@
 #include "trusty_keymaster_context.h"
 #include "secure_storage.h"
 
-extern "C" {
 #include <lib/hwkey/hwkey.h>
 #include <lib/rng/trusty_rng.h>
-}
 
 #include <keymaster/android_keymaster_utils.h>
 #include <keymaster/ec_key_factory.h>

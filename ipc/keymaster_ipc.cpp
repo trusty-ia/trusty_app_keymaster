@@ -14,23 +14,19 @@
  * limitations under the License.
  */
 
-// TODO: add guard in header
-extern "C" {
-#include <stdlib.h>
-}
+#include "keymaster_ipc.h"
 
 #include <stddef.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
-
+#include <trusty_ipc.h>
 #include <uapi/err.h>
-#include <trusty_std.h>
 
 #include <interface/keymaster/keymaster.h>
 
 #include <keymaster/UniquePtr.h>
 
-#include "keymaster_ipc.h"
 #include "trusty_keymaster.h"
 #include "trusty_logger.h"
 

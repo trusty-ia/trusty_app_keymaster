@@ -14,10 +14,8 @@
  * limitations under the License.
  */
 
-extern "C" {
 #include <assert.h>
 #include <stdlib.h>
-}
 
 #include <keymaster/android_keymaster_utils.h>
 

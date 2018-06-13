@@ -18,10 +18,6 @@
 
 #include <openssl/hmac.h>
 
-extern "C" {
-#include <trusty_std.h>
-}
-
 #include <hardware/hw_auth_token.h>
 #include <keymaster/android_keymaster_utils.h>
 

@@ -32,7 +32,6 @@
 #define typeof(x) __typeof__(x)
 #include <lib/rng/trusty_rng.h>
 #include <lib/storage/storage.h>
-#include <trusty_std.h>
 #include <trusty_unittest.h>
 
 #include "../secure_storage.h"

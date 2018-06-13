@@ -16,13 +16,11 @@
 
 #include "secure_storage.h"
 
-extern "C" {
-#include <uapi/err.h>
 #include <errno.h>
 #include <stdio.h>
+#include <uapi/err.h>
 
 #include <lib/storage/storage.h>
-}
 
 #include "trusty_keymaster_context.h"
 #include "trusty_logger.h"

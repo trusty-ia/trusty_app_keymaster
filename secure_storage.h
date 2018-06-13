@@ -17,9 +17,7 @@
 #ifndef TRUSTY_APP_KEYMASTER_SECURE_STORAGE_H_
 #define TRUSTY_APP_KEYMASTER_SECURE_STORAGE_H_
 
-extern "C" {
 #include <hardware/keymaster_defs.h>
-}
 
 namespace keymaster {
 
