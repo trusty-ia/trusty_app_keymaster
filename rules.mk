@@ -24,7 +24,7 @@ MODULE_SRCS += \
 	$(KEYMASTER_ROOT)/km_openssl/aes_key.cpp \
 	$(KEYMASTER_ROOT)/km_openssl/aes_operation.cpp \
 	$(KEYMASTER_ROOT)/android_keymaster/android_keymaster.cpp \
-	$(KEYMASTER_ROOT)/android_keymaster/android_keymaster_messages.cpp \
+	$(LOCAL_DIR)/override/android_keymaster_messages.cpp \
 	$(KEYMASTER_ROOT)/android_keymaster/android_keymaster_utils.cpp \
 	$(KEYMASTER_ROOT)/km_openssl/asymmetric_key.cpp \
 	$(KEYMASTER_ROOT)/km_openssl/asymmetric_key_factory.cpp \
