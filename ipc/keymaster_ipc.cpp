@@ -173,27 +173,30 @@ static long send_error_response(handle_t chan,
                          sizeof(err));
 }
 
-template <typename Keymaster, typename Request, typename Response>
-static long do_dispatch(void (Keymaster::*operation)(const Request&, Response*),
-                        struct keymaster_message* msg,
-                        uint32_t payload_size,
-                        keymaster::UniquePtr<uint8_t[]>* out,
-                        uint32_t* out_size) {
+/*
+ * deseralize_request and serialize_request are used by the different
+ * overloads of the do_dispatch template to handle the new API signatures
+ * that keymaster is migrating to.
+ */
+template <typename Request>
+static long deserialize_request(struct keymaster_message* msg,
+                                uint32_t payload_size,
+                                Request& req) {
     const uint8_t* payload = msg->payload;
-    Request req;
     req.message_version = message_version;
+
     if (!req.Deserialize(&payload, msg->payload + payload_size))
         return ERR_NOT_VALID;
 
-    Response rsp;
+    return NO_ERROR;
+}
+
+template <typename Response>
+static long serialize_response(Response& rsp,
+                               keymaster::UniquePtr<uint8_t[]>* out,
+                               uint32_t* out_size) {
     rsp.message_version = message_version;
-    (device->*operation)(req, &rsp);
-
     *out_size = rsp.SerializedSize();
-
-    if (msg->cmd == KM_CONFIGURE) {
-        device->set_configure_error(rsp.error);
-    }
 
     out->reset(new uint8_t[*out_size]);
     if (out->get() == NULL) {
@@ -202,6 +205,66 @@ static long do_dispatch(void (Keymaster::*operation)(const Request&, Response*),
     }
 
     rsp.Serialize(out->get(), out->get() + *out_size);
+
+    return NO_ERROR;
+}
+
+template <typename Keymaster, typename Request, typename Response>
+static long do_dispatch(void (Keymaster::*operation)(const Request&, Response*),
+                        struct keymaster_message* msg,
+                        uint32_t payload_size,
+                        keymaster::UniquePtr<uint8_t[]>* out,
+                        uint32_t* out_size) {
+    status_t err;
+    Request req;
+
+    err = deserialize_request(msg, payload_size, req);
+    if (err != NO_ERROR)
+        return err;
+
+    Response rsp;
+    (device->*operation)(req, &rsp);
+
+    if (msg->cmd == KM_CONFIGURE) {
+        device->set_configure_error(rsp.error);
+    }
+
+    err = serialize_response(rsp, out, out_size);
+    if (err != NO_ERROR) {
+        LOG_E("Error serializing response", 0);
+        return err;
+    }
+
+    return NO_ERROR;
+}
+
+/*
+ * Keymaster is migrating to new API signatures.
+ * This overloaded dispatch is used for methods that accept one Request argument
+ * and return a Response (e.g. COMPUTE_SHARED_HMAC_RESPONSE)
+ */
+template <typename Keymaster, typename Request, typename Response>
+static long do_dispatch(Response (Keymaster::*operation)(const Request&),
+                        struct keymaster_message* msg,
+                        uint32_t payload_size,
+                        keymaster::UniquePtr<uint8_t[]>* out,
+                        uint32_t* out_size) {
+    status_t err;
+    Request req;
+
+    err = deserialize_request(msg, payload_size, req);
+    if (err != NO_ERROR)
+        return err;
+
+    Response rsp = ((device->*operation)(req));
+
+    if (msg->cmd == KM_CONFIGURE) {
+        device->set_configure_error(rsp.error);
+    }
+
+    err = serialize_response(rsp, out, out_size);
+    if (err != NO_ERROR)
+        return err;
 
     return NO_ERROR;
 }
@@ -381,6 +444,16 @@ static long keymaster_dispatch_non_secure(keymaster_chan_ctx* ctx,
         LOG_D("Dispatching CONFIGURE, size %d", payload_size);
         return do_dispatch(&TrustyKeymaster::Configure, msg, payload_size, out,
                            out_size);
+
+    case KM_COMPUTE_SHARED_HMAC:
+        LOG_D("Dispatching COMPUTE_SHARED_HMAC, size %d", payload_size);
+        return do_dispatch(&TrustyKeymaster::ComputeSharedHmac, msg,
+                           payload_size, out, out_size);
+
+    case KM_VERIFY_AUTHORIZATION:
+        LOG_D("Dispatching VERIFY_AUTHORIZATION, size %d", payload_size);
+        return do_dispatch(&TrustyKeymaster::VerifyAuthorization, msg,
+                           payload_size, out, out_size);
 
     case KM_IMPORT_WRAPPED_KEY:
         LOG_D("Dispatching IMPORT_WRAPPED_KEY, size %d", payload_size);
