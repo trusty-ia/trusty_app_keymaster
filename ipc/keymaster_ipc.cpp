@@ -269,6 +269,30 @@ static long do_dispatch(Response (Keymaster::*operation)(const Request&),
     return NO_ERROR;
 }
 
+/* Keymaster is migrating to new API signatures.
+ * This overloaded dispatch is used for methods that do not have arguments
+ * and return a Response (e.g. GET_HMAC_SHARING_PARAMETERS)
+ * */
+template <typename Keymaster, typename Response>
+static long do_dispatch(Response (Keymaster::*operation)(),
+                        struct keymaster_message* msg,
+                        uint32_t payload_size,
+                        keymaster::UniquePtr<uint8_t[]>* out,
+                        uint32_t* out_size) {
+    status_t err;
+    Response rsp = ((device->*operation)());
+
+    if (msg->cmd == KM_CONFIGURE) {
+        device->set_configure_error(rsp.error);
+    }
+
+    err = serialize_response(rsp, out, out_size);
+    if (err != NO_ERROR)
+        return err;
+
+    return NO_ERROR;
+}
+
 static long get_auth_token_key(keymaster::UniquePtr<uint8_t[]>* key_buf,
                                uint32_t* key_size) {
     keymaster_key_blob_t key;
@@ -444,6 +468,11 @@ static long keymaster_dispatch_non_secure(keymaster_chan_ctx* ctx,
         LOG_D("Dispatching CONFIGURE, size %d", payload_size);
         return do_dispatch(&TrustyKeymaster::Configure, msg, payload_size, out,
                            out_size);
+
+    case KM_GET_HMAC_SHARING_PARAMETERS:
+        LOG_D("Dispatching GET_HMAC_SHARING_PARAMETERS, size %d", payload_size);
+        return do_dispatch(&TrustyKeymaster::GetHmacSharingParameters, msg,
+                           payload_size, out, out_size);
 
     case KM_COMPUTE_SHARED_HMAC:
         LOG_D("Dispatching COMPUTE_SHARED_HMAC, size %d", payload_size);
