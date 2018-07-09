@@ -382,6 +382,21 @@ static long keymaster_dispatch_non_secure(keymaster_chan_ctx* ctx,
         return do_dispatch(&TrustyKeymaster::Configure, msg, payload_size, out,
                            out_size);
 
+    case KM_IMPORT_WRAPPED_KEY:
+        LOG_D("Dispatching IMPORT_WRAPPED_KEY, size %d", payload_size);
+        return do_dispatch(&TrustyKeymaster::ImportWrappedKey, msg,
+                           payload_size, out, out_size);
+
+    case KM_DELETE_KEY:
+        LOG_D("Dispatching DELETE_KEY, size %d", payload_size);
+        return do_dispatch(&TrustyKeymaster::DeleteKey, msg, payload_size, out,
+                           out_size);
+
+    case KM_DELETE_ALL_KEYS:
+        LOG_D("Dispatching DELETE_ALL_KEYS, size %d", payload_size);
+        return do_dispatch(&TrustyKeymaster::DeleteAllKeys, msg, payload_size,
+                           out, out_size);
+
     case KM_SET_BOOT_PARAMS:
         LOG_D("Dispatching SET_BOOT_PARAMS, size %d", payload_size);
         return do_dispatch(&TrustyKeymaster::SetBootParams, msg, payload_size,
