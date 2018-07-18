@@ -15,7 +15,7 @@
 
 CUR_DIR := $(GET_LOCAL_DIR)
 
-ATAP_ROOT := $(CUR_DIR)/../../../system/iot/attestation/atap
+ATAP_ROOT := $(TRUSTY_TOP)/system/iot/attestation/atap
 
 MODULE_SRCS += \
   $(ATAP_ROOT)/libatap/atap_commands.c \

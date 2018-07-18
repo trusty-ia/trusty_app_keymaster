@@ -17,7 +17,7 @@ LOCAL_DIR := $(GET_LOCAL_DIR)
 
 MODULE := $(LOCAL_DIR)
 
-KEYMASTER_ROOT := $(LOCAL_DIR)/../../system/keymaster
+KEYMASTER_ROOT := $(TRUSTY_TOP)/system/keymaster
 
 MODULE_SRCS += \
 	$(KEYMASTER_ROOT)/aes_key.cpp \
@@ -60,7 +60,7 @@ MODULE_SRCS += \
 MODULE_INCLUDES := \
 	$(KEYMASTER_ROOT)/include \
 	$(KEYMASTER_ROOT) \
-	$(LOCAL_DIR)/../../hardware/libhardware/include \
+	$(TRUSTY_TOP)/hardware/libhardware/include \
 	$(LOCAL_DIR)
 
 MODULE_CPPFLAGS := -std=c++11 -fno-short-enums
