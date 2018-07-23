@@ -80,7 +80,7 @@ MODULE_DEPS += \
 	lib/rng \
 	lib/hwkey \
 	lib/storage \
-	openssl
+	external/boringssl \
 
 include $(LOCAL_DIR)/atap/rules.mk
 include $(LOCAL_DIR)/ipc/rules.mk
