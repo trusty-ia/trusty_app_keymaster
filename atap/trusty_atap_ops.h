@@ -29,11 +29,12 @@
 
 namespace keymaster {
 
-// An ops implementation for Trusty. All instances of this class must be created on the same thread.
-// This class is intended to be used with libatap and does not perform additional verification of
-// data formats. Only use this class with sanitized inputs.
+// An ops implementation for Trusty. All instances of this class must be created
+// on the same thread. This class is intended to be used with libatap and does
+// not perform additional verification of data formats. Only use this class with
+// sanitized inputs.
 class TrustyAtapOps : public atap::OpensslOps {
-  public:
+public:
     TrustyAtapOps();
     ~TrustyAtapOps() override;
 
@@ -41,26 +42,32 @@ class TrustyAtapOps : public atap::OpensslOps {
     void set_product_id(uint8_t product_id[ATAP_PRODUCT_ID_LEN]);
 
     // AtapOpsDelegate methods. Other methods are handled by OpensslOps.
-    AtapResult read_product_id(uint8_t product_id[ATAP_PRODUCT_ID_LEN]) override;
+    AtapResult read_product_id(
+            uint8_t product_id[ATAP_PRODUCT_ID_LEN]) override;
 
     AtapResult get_auth_key_type(AtapKeyType* key_type) override;
 
     AtapResult read_auth_key_cert_chain(AtapCertChain* cert_chain) override;
 
-    AtapResult write_attestation_key(AtapKeyType key_type, const AtapBlob* key,
+    AtapResult write_attestation_key(AtapKeyType key_type,
+                                     const AtapBlob* key,
                                      const AtapCertChain* cert_chain) override;
 
-    AtapResult read_attestation_public_key(AtapKeyType key_type, uint8_t pubkey[ATAP_KEY_LEN_MAX],
+    AtapResult read_attestation_public_key(AtapKeyType key_type,
+                                           uint8_t pubkey[ATAP_KEY_LEN_MAX],
                                            uint32_t* pubkey_len) override;
 
-    AtapResult read_soc_global_key(uint8_t global_key[ATAP_AES_128_KEY_LEN]) override;
+    AtapResult read_soc_global_key(
+            uint8_t global_key[ATAP_AES_128_KEY_LEN]) override;
 
     AtapResult write_hex_uuid(const uint8_t uuid[ATAP_HEX_UUID_LEN]) override;
 
-    AtapResult auth_key_sign(const uint8_t* nonce, uint32_t nonce_len,
-                             uint8_t sig[ATAP_SIGNATURE_LEN_MAX], uint32_t* sig_len) override;
+    AtapResult auth_key_sign(const uint8_t* nonce,
+                             uint32_t nonce_len,
+                             uint8_t sig[ATAP_SIGNATURE_LEN_MAX],
+                             uint32_t* sig_len) override;
 
-  private:
+private:
     uint8_t product_id_[ATAP_PRODUCT_ID_LEN]{};
 };
 

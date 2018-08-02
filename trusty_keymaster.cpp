@@ -43,8 +43,9 @@ void TrustyKeymaster::SetBootParams(const SetBootParamsRequest& request,
         return;
 
     response->error = context_->SetBootParams(
-        request.os_version, request.os_patchlevel, request.verified_boot_key,
-        request.verified_boot_state, request.device_locked, request.verified_boot_hash);
+            request.os_version, request.os_patchlevel,
+            request.verified_boot_key, request.verified_boot_state,
+            request.device_locked, request.verified_boot_hash);
 }
 
 void TrustyKeymaster::SetAttestationKey(const SetAttestationKeyRequest& request,
@@ -79,8 +80,9 @@ void TrustyKeymaster::SetAttestationKey(const SetAttestationKeyRequest& request,
     response->error = WriteKeyToStorage(key_slot, key, key_size);
 }
 
-void TrustyKeymaster::AppendAttestationCertChain(const AppendAttestationCertChainRequest& request,
-                                                 AppendAttestationCertChainResponse* response) {
+void TrustyKeymaster::AppendAttestationCertChain(
+        const AppendAttestationCertChainRequest& request,
+        AppendAttestationCertChainResponse* response) {
     if (response == nullptr)
         return;
 
@@ -122,7 +124,8 @@ void TrustyKeymaster::AppendAttestationCertChain(const AppendAttestationCertChai
             return;
         }
     }
-    response->error = WriteCertToStorage(key_slot, cert, cert_size, cert_chain_length);
+    response->error =
+            WriteCertToStorage(key_slot, cert, cert_size, cert_chain_length);
 }
 
 void TrustyKeymaster::AtapGetCaRequest(const AtapGetCaRequestRequest& request,
@@ -138,9 +141,9 @@ void TrustyKeymaster::AtapGetCaRequest(const AtapGetCaRequestRequest& request,
     uint8_t* ca_request;
     uint32_t ca_request_size;
     const Buffer& operation_start = request.data;
-    AtapResult result =
-        atap_get_ca_request(atap_ops_provider_.atap_ops(), operation_start.begin(),
-                            operation_start.available_read(), &ca_request, &ca_request_size);
+    AtapResult result = atap_get_ca_request(
+            atap_ops_provider_.atap_ops(), operation_start.begin(),
+            operation_start.available_read(), &ca_request, &ca_request_size);
     response->error = KM_ERROR_UNKNOWN_ERROR;
     if (result != ATAP_RESULT_OK) {
         return;
@@ -155,8 +158,9 @@ void TrustyKeymaster::AtapGetCaRequest(const AtapGetCaRequestRequest& request,
 #endif
 }
 
-void TrustyKeymaster::AtapSetCaResponseBegin(const AtapSetCaResponseBeginRequest& request,
-                                             AtapSetCaResponseBeginResponse* response) {
+void TrustyKeymaster::AtapSetCaResponseBegin(
+        const AtapSetCaResponseBeginRequest& request,
+        AtapSetCaResponseBeginResponse* response) {
     if (response == nullptr)
         return;
 
@@ -177,8 +181,9 @@ void TrustyKeymaster::AtapSetCaResponseBegin(const AtapSetCaResponseBeginRequest
 #endif
 }
 
-void TrustyKeymaster::AtapSetCaResponseUpdate(const AtapSetCaResponseUpdateRequest& request,
-                                              AtapSetCaResponseUpdateResponse* response) {
+void TrustyKeymaster::AtapSetCaResponseUpdate(
+        const AtapSetCaResponseUpdateRequest& request,
+        AtapSetCaResponseUpdateResponse* response) {
     if (response == nullptr)
         return;
 
@@ -195,8 +200,9 @@ void TrustyKeymaster::AtapSetCaResponseUpdate(const AtapSetCaResponseUpdateReque
 #endif
 }
 
-void TrustyKeymaster::AtapSetCaResponseFinish(const AtapSetCaResponseFinishRequest& request,
-                                              AtapSetCaResponseFinishResponse* response) {
+void TrustyKeymaster::AtapSetCaResponseFinish(
+        const AtapSetCaResponseFinishRequest& request,
+        AtapSetCaResponseFinishResponse* response) {
     if (response == nullptr)
         return;
 
@@ -207,12 +213,13 @@ void TrustyKeymaster::AtapSetCaResponseFinish(const AtapSetCaResponseFinishReque
 #else
     response->error = KM_ERROR_INVALID_INPUT_LENGTH;
     if (ca_response_.available_read() != ca_response_.buffer_size()) {
-        LOG_E("Did not receive full CA Response message: %d / %d\n", ca_response_.available_read(),
-              ca_response_.buffer_size());
+        LOG_E("Did not receive full CA Response message: %d / %d\n",
+              ca_response_.available_read(), ca_response_.buffer_size());
         return;
     }
     response->error = KM_ERROR_UNKNOWN_ERROR;
-    AtapResult result = atap_set_ca_response(atap_ops_provider_.atap_ops(), ca_response_.begin(),
+    AtapResult result = atap_set_ca_response(atap_ops_provider_.atap_ops(),
+                                             ca_response_.begin(),
                                              ca_response_.available_read());
     if (result == ATAP_RESULT_OK) {
         response->error = KM_ERROR_OK;

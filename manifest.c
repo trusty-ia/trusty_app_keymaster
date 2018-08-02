@@ -16,18 +16,19 @@
 #include <stddef.h>
 #include <trusty_app_manifest.h>
 
-trusty_app_manifest_t TRUSTY_APP_MANIFEST_ATTRS trusty_app_manifest =
-{
-	/* UUID : {5f902ace-5e5c-4cd8-ae54-87b88c22ddaf} */
-	{ 0x5f902ace, 0x5e5c, 0x4cd8,
-		{ 0xae, 0x54, 0x87, 0xb8, 0x8c, 0x22, 0xdd, 0xaf } },
+trusty_app_manifest_t TRUSTY_APP_MANIFEST_ATTRS trusty_app_manifest = {
+        /* UUID : {5f902ace-5e5c-4cd8-ae54-87b88c22ddaf} */
+        {0x5f902ace,
+         0x5e5c,
+         0x4cd8,
+         {0xae, 0x54, 0x87, 0xb8, 0x8c, 0x22, 0xdd, 0xaf}},
 
-	/* optional configuration options here */
-	{
-		/* openssl need a larger heap */
-		TRUSTY_APP_CONFIG_MIN_HEAP_SIZE(24 * 4096),
+        /* optional configuration options here */
+        {
+                /* openssl need a larger heap */
+                TRUSTY_APP_CONFIG_MIN_HEAP_SIZE(24 * 4096),
 
-		/* openssl need a larger stack */
-		TRUSTY_APP_CONFIG_MIN_STACK_SIZE(8 * 4096),
-	},
+                /* openssl need a larger stack */
+                TRUSTY_APP_CONFIG_MIN_STACK_SIZE(8 * 4096),
+        },
 };

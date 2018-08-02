@@ -15,9 +15,9 @@
  */
 
 /**
- * This app tests the API in app/keymaster/secure_storage.h. To run this test, include
- * keymaster/storage_test in TRUSTY_ALL_USER_TASKS, and it will be start once an RPMB
- * proxy becomes available.
+ * This app tests the API in app/keymaster/secure_storage.h. To run this test,
+ * include keymaster/storage_test in TRUSTY_ALL_USER_TASKS, and it will be start
+ * once an RPMB proxy becomes available.
  *
  * *** IMPORTANT ***
  * This test will delete all existing attestation data stored in RPMB.
@@ -34,9 +34,9 @@
 #include <lib/storage/storage.h>
 #include <trusty_unittest.h>
 
-#include "../secure_storage.h"
 #include <UniquePtr.h>
 #include <keymaster/android_keymaster_utils.h>
+#include "../secure_storage.h"
 
 #define DATA_SIZE 1000
 #define CHAIN_LENGTH 3
@@ -138,7 +138,8 @@ void TestCertChainStorage(AttestationKeySlot key_slot, bool chain_exists) {
     ASSERT_EQ(CHAIN_LENGTH, chain.get()->entry_count);
     for (i = 0; i < CHAIN_LENGTH; ++i) {
         ASSERT_EQ(DATA_SIZE, chain.get()->entries[i].data_length);
-        ASSERT_EQ(0, memcmp(write_cert[i].get(), chain.get()->entries[i].data, DATA_SIZE));
+        ASSERT_EQ(0, memcmp(write_cert[i].get(), chain.get()->entries[i].data,
+                            DATA_SIZE));
     }
 
 test_abort:

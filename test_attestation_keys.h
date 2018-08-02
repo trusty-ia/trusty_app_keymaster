@@ -20,15 +20,16 @@
 namespace keymaster {
 
 /**
- * On success, writes address of a software attestation key to |key| and writes the length to
- * |key_length|. Caller does not take ownership of software keys
+ * On success, writes address of a software attestation key to |key| and writes
+ * the length to |key_length|. Caller does not take ownership of software keys
  */
-keymaster_error_t GetSoftwareAttestationKey(keymaster_algorithm_t algorithm, uint8_t** key,
+keymaster_error_t GetSoftwareAttestationKey(keymaster_algorithm_t algorithm,
+                                            uint8_t** key,
                                             uint32_t* key_length);
 
 /**
- * On success, allocates and copies software attestation certificate chain to |chain|. Caller
- * takes ownership of all memory allocated for |chain|.
+ * On success, allocates and copies software attestation certificate chain to
+ * |chain|. Caller takes ownership of all memory allocated for |chain|.
  */
 keymaster_error_t GetSoftwareAttestationChain(keymaster_algorithm_t algorithm,
                                               keymaster_cert_chain_t* chain);

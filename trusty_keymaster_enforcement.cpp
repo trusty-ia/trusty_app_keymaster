@@ -26,8 +26,9 @@
 
 namespace keymaster {
 
-bool TrustyKeymasterEnforcement::auth_token_timed_out(const hw_auth_token_t& token,
-                                                      uint32_t timeout_seconds) const {
+bool TrustyKeymasterEnforcement::auth_token_timed_out(
+        const hw_auth_token_t& token,
+        uint32_t timeout_seconds) const {
     uint64_t token_timestamp_millis = ntoh(token.timestamp);
     uint64_t timeout_millis = static_cast<uint64_t>(timeout_seconds) * 1000;
     uint64_t millis_since_boot = milliseconds_since_boot();
@@ -43,7 +44,8 @@ inline size_t min(size_t a, size_t b) {
     return a < b ? a : b;
 }
 
-bool TrustyKeymasterEnforcement::ValidateTokenSignature(const hw_auth_token_t& token) const {
+bool TrustyKeymasterEnforcement::ValidateTokenSignature(
+        const hw_auth_token_t& token) const {
     keymaster_key_blob_t auth_token_key;
     keymaster_error_t error = context_->GetAuthTokenKey(&auth_token_key);
     if (error != KM_ERROR_OK)
@@ -51,17 +53,21 @@ bool TrustyKeymasterEnforcement::ValidateTokenSignature(const hw_auth_token_t& t
 
     // Signature covers entire token except HMAC field.
     const uint8_t* hash_data = reinterpret_cast<const uint8_t*>(&token);
-    size_t hash_data_length = reinterpret_cast<const uint8_t*>(&token.hmac) - hash_data;
+    size_t hash_data_length =
+            reinterpret_cast<const uint8_t*>(&token.hmac) - hash_data;
 
     uint8_t computed_hash[EVP_MAX_MD_SIZE];
     unsigned int computed_hash_length;
-    if (!HMAC(EVP_sha256(), auth_token_key.key_material, auth_token_key.key_material_size,
-              hash_data, hash_data_length, computed_hash, &computed_hash_length)) {
-        LOG_S("Error %d computing token signature", TranslateLastOpenSslError());
+    if (!HMAC(EVP_sha256(), auth_token_key.key_material,
+              auth_token_key.key_material_size, hash_data, hash_data_length,
+              computed_hash, &computed_hash_length)) {
+        LOG_S("Error %d computing token signature",
+              TranslateLastOpenSslError());
         return false;
     }
 
-    return 0 == memcmp_s(computed_hash, token.hmac, min(sizeof(token.hmac), computed_hash_length));
+    return 0 == memcmp_s(computed_hash, token.hmac,
+                         min(sizeof(token.hmac), computed_hash_length));
 }
 
 uint64_t TrustyKeymasterEnforcement::milliseconds_since_boot() const {
@@ -70,7 +76,8 @@ uint64_t TrustyKeymasterEnforcement::milliseconds_since_boot() const {
     rv = gettime(0, 0, &secure_time_ns);
     if (rv || secure_time_ns < 0) {
         LOG_S("Error getting time. Error: %d, time: %lld", rv, secure_time_ns);
-        secure_time_ns = 0xFFFFFFFFFFFFFFFFL; // UINT64_MAX isn't defined (b/22120972)
+        secure_time_ns =
+                0xFFFFFFFFFFFFFFFFL;  // UINT64_MAX isn't defined (b/22120972)
     }
     return static_cast<uint64_t>(secure_time_ns) / 1000 / 1000;
 }

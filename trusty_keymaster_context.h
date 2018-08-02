@@ -33,53 +33,68 @@ static const int kAuthTokenKeySize = 32;
 static const int kMaxCertChainLength = 3;
 
 class TrustyKeymasterContext : public KeymasterContext {
-  public:
+public:
     TrustyKeymasterContext();
 
     keymaster_security_level_t GetSecurityLevel() const override {
         return KM_SECURITY_LEVEL_TRUSTED_ENVIRONMENT;
     }
 
-    keymaster_error_t SetSystemVersion(uint32_t os_version, uint32_t os_patchlevel) override;
-    void GetSystemVersion(uint32_t* os_version, uint32_t* os_patchlevel) const override;
+    keymaster_error_t SetSystemVersion(uint32_t os_version,
+                                       uint32_t os_patchlevel) override;
+    void GetSystemVersion(uint32_t* os_version,
+                          uint32_t* os_patchlevel) const override;
 
     KeyFactory* GetKeyFactory(keymaster_algorithm_t algorithm) const override;
-    OperationFactory* GetOperationFactory(keymaster_algorithm_t algorithm,
-                                          keymaster_purpose_t purpose) const override;
-    keymaster_algorithm_t* GetSupportedAlgorithms(size_t* algorithms_count) const override;
+    OperationFactory* GetOperationFactory(
+            keymaster_algorithm_t algorithm,
+            keymaster_purpose_t purpose) const override;
+    keymaster_algorithm_t* GetSupportedAlgorithms(
+            size_t* algorithms_count) const override;
 
-    keymaster_error_t GetVerifiedBootParams(keymaster_blob_t* verified_boot_key,
-                                            keymaster_verified_boot_t* verified_boot_state,
-                                            bool* device_locked) const override;
+    keymaster_error_t GetVerifiedBootParams(
+            keymaster_blob_t* verified_boot_key,
+            keymaster_verified_boot_t* verified_boot_state,
+            bool* device_locked) const override;
 
-    keymaster_error_t CreateKeyBlob(const AuthorizationSet& key_description,
-                                    keymaster_key_origin_t origin,
-                                    const KeymasterKeyBlob& key_material, KeymasterKeyBlob* blob,
-                                    AuthorizationSet* hw_enforced,
-                                    AuthorizationSet* sw_enforced) const override;
+    keymaster_error_t CreateKeyBlob(
+            const AuthorizationSet& key_description,
+            keymaster_key_origin_t origin,
+            const KeymasterKeyBlob& key_material,
+            KeymasterKeyBlob* blob,
+            AuthorizationSet* hw_enforced,
+            AuthorizationSet* sw_enforced) const override;
 
-    keymaster_error_t UpgradeKeyBlob(const KeymasterKeyBlob& key_to_upgrade,
-                                     const AuthorizationSet& upgrade_params,
-                                     KeymasterKeyBlob* upgraded_key) const override;
+    keymaster_error_t UpgradeKeyBlob(
+            const KeymasterKeyBlob& key_to_upgrade,
+            const AuthorizationSet& upgrade_params,
+            KeymasterKeyBlob* upgraded_key) const override;
 
-    keymaster_error_t ParseKeyBlob(const KeymasterKeyBlob& blob,
-                                   const AuthorizationSet& additional_params,
-                                   KeymasterKeyBlob* key_material, AuthorizationSet* hw_enforced,
-                                   AuthorizationSet* sw_enforced) const override;
+    keymaster_error_t ParseKeyBlob(
+            const KeymasterKeyBlob& blob,
+            const AuthorizationSet& additional_params,
+            KeymasterKeyBlob* key_material,
+            AuthorizationSet* hw_enforced,
+            AuthorizationSet* sw_enforced) const override;
 
-    keymaster_error_t AddRngEntropy(const uint8_t* buf, size_t length) const override;
+    keymaster_error_t AddRngEntropy(const uint8_t* buf,
+                                    size_t length) const override;
 
-    keymaster_error_t GenerateRandom(uint8_t* buf, size_t length) const override;
+    keymaster_error_t GenerateRandom(uint8_t* buf,
+                                     size_t length) const override;
 
     keymaster_error_t GetAuthTokenKey(keymaster_key_blob_t* key) const;
 
-    KeymasterEnforcement* enforcement_policy() override { return &enforcement_policy_; }
+    KeymasterEnforcement* enforcement_policy() override {
+        return &enforcement_policy_;
+    }
 
     EVP_PKEY* AttestationKey(keymaster_algorithm_t algorithm,
                              keymaster_error_t* error) const override;
 
-    keymaster_cert_chain_t* AttestationChain(keymaster_algorithm_t algorithm,
-                                             keymaster_error_t* error) const override;
+    keymaster_cert_chain_t* AttestationChain(
+            keymaster_algorithm_t algorithm,
+            keymaster_error_t* error) const override;
 
     keymaster_error_t GenerateUniqueId(uint64_t creation_date_time,
                                        const keymaster_blob_t& application_id,
@@ -88,12 +103,15 @@ class TrustyKeymasterContext : public KeymasterContext {
         return KM_ERROR_UNIMPLEMENTED;
     }
 
-    keymaster_error_t SetBootParams(uint32_t /* os_version */, uint32_t /* os_patchlevel */,
-                                    const Buffer& verified_boot_key,
-                                    keymaster_verified_boot_t verified_boot_state,
-                                    bool device_locked, const Buffer& verified_boot_hash);
+    keymaster_error_t SetBootParams(
+            uint32_t /* os_version */,
+            uint32_t /* os_patchlevel */,
+            const Buffer& verified_boot_key,
+            keymaster_verified_boot_t verified_boot_state,
+            bool device_locked,
+            const Buffer& verified_boot_hash);
 
-  private:
+private:
     bool SeedRngIfNeeded() const;
     bool ShouldReseedRng() const;
     bool ReseedRng();
@@ -102,21 +120,23 @@ class TrustyKeymasterContext : public KeymasterContext {
                                         keymaster_key_origin_t origin,
                                         AuthorizationSet* hw_enforced,
                                         AuthorizationSet* sw_enforced) const;
-    keymaster_error_t BuildHiddenAuthorizations(const AuthorizationSet& input_set,
-                                                AuthorizationSet* hidden) const;
+    keymaster_error_t BuildHiddenAuthorizations(
+            const AuthorizationSet& input_set,
+            AuthorizationSet* hidden) const;
     keymaster_error_t DeriveMasterKey(KeymasterKeyBlob* master_key) const;
     /*
-     * CreateAuthEncryptedKeyBlob takes a key description authorization set, key material,
-     * and hardware and software authorization sets and produces an encrypted and
-     * integrity-checked key blob.
+     * CreateAuthEncryptedKeyBlob takes a key description authorization set, key
+     * material, and hardware and software authorization sets and produces an
+     * encrypted and integrity-checked key blob.
      *
      * This method is called by CreateKeyBlob and UpgradeKeyBlob.
      */
-    keymaster_error_t CreateAuthEncryptedKeyBlob(const AuthorizationSet& key_description,
-                                                 const KeymasterKeyBlob& key_material,
-                                                 const AuthorizationSet& hw_enforced,
-                                                 const AuthorizationSet& sw_enforced,
-                                                 KeymasterKeyBlob* blob) const;
+    keymaster_error_t CreateAuthEncryptedKeyBlob(
+            const AuthorizationSet& key_description,
+            const KeymasterKeyBlob& key_material,
+            const AuthorizationSet& hw_enforced,
+            const AuthorizationSet& sw_enforced,
+            KeymasterKeyBlob* blob) const;
 
     TrustyKeymasterEnforcement enforcement_policy_;
 
@@ -135,7 +155,8 @@ class TrustyKeymasterContext : public KeymasterContext {
     uint32_t boot_os_version_ = 0;
     uint32_t boot_os_patchlevel_ = 0;
     Buffer verified_boot_key_;
-    keymaster_verified_boot_t verified_boot_state_ = KM_VERIFIED_BOOT_UNVERIFIED;
+    keymaster_verified_boot_t verified_boot_state_ =
+            KM_VERIFIED_BOOT_UNVERIFIED;
     bool device_locked_ = false;
     Buffer verified_boot_hash_;
 };

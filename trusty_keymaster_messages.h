@@ -25,7 +25,8 @@ namespace keymaster {
  * Generic struct for Keymaster requests which hold a single raw buffer.
  */
 struct RawBufferRequest : public KeymasterMessage {
-    explicit RawBufferRequest(int32_t ver = MAX_MESSAGE_VERSION) : KeymasterMessage(ver) {}
+    explicit RawBufferRequest(int32_t ver = MAX_MESSAGE_VERSION)
+            : KeymasterMessage(ver) {}
 
     size_t SerializedSize() const override { return data.SerializedSize(); }
     uint8_t* Serialize(uint8_t* buf, const uint8_t* end) const override {
@@ -42,13 +43,18 @@ struct RawBufferRequest : public KeymasterMessage {
  * Generic struct for Keymaster responses which hold a single raw buffer.
  */
 struct RawBufferResponse : public KeymasterResponse {
-    explicit RawBufferResponse(int32_t ver = MAX_MESSAGE_VERSION) : KeymasterResponse(ver) {}
+    explicit RawBufferResponse(int32_t ver = MAX_MESSAGE_VERSION)
+            : KeymasterResponse(ver) {}
 
-    size_t NonErrorSerializedSize() const override { return data.SerializedSize(); }
-    uint8_t* NonErrorSerialize(uint8_t* buf, const uint8_t* end) const override {
+    size_t NonErrorSerializedSize() const override {
+        return data.SerializedSize();
+    }
+    uint8_t* NonErrorSerialize(uint8_t* buf,
+                               const uint8_t* end) const override {
         return data.Serialize(buf, end);
     }
-    bool NonErrorDeserialize(const uint8_t** buf_ptr, const uint8_t* end) override {
+    bool NonErrorDeserialize(const uint8_t** buf_ptr,
+                             const uint8_t* end) override {
         return data.Deserialize(buf_ptr, end);
     }
 
@@ -56,31 +62,45 @@ struct RawBufferResponse : public KeymasterResponse {
 };
 
 /**
- * Generic struct for Keymaster responses which have no specialized response data.
+ * Generic struct for Keymaster responses which have no specialized response
+ * data.
  */
 struct NoResponse : public KeymasterResponse {
-    explicit NoResponse(int32_t ver = MAX_MESSAGE_VERSION) : KeymasterResponse(ver) {}
+    explicit NoResponse(int32_t ver = MAX_MESSAGE_VERSION)
+            : KeymasterResponse(ver) {}
 
     size_t NonErrorSerializedSize() const override { return 0; }
-    uint8_t* NonErrorSerialize(uint8_t* buf, const uint8_t* end) const override { return buf; }
-    bool NonErrorDeserialize(const uint8_t** buf_ptr, const uint8_t* end) override { return true; }
+    uint8_t* NonErrorSerialize(uint8_t* buf,
+                               const uint8_t* end) const override {
+        return buf;
+    }
+    bool NonErrorDeserialize(const uint8_t** buf_ptr,
+                             const uint8_t* end) override {
+        return true;
+    }
 };
 
 struct NoRequest : public KeymasterMessage {
-    explicit NoRequest(int32_t ver = MAX_MESSAGE_VERSION) : KeymasterMessage(ver) {}
+    explicit NoRequest(int32_t ver = MAX_MESSAGE_VERSION)
+            : KeymasterMessage(ver) {}
 
     size_t SerializedSize() const override { return 0; }
-    uint8_t* Serialize(uint8_t* buf, const uint8_t* end) const override { return buf; }
-    bool Deserialize(const uint8_t** buf_ptr, const uint8_t* end) override { return true; }
-
+    uint8_t* Serialize(uint8_t* buf, const uint8_t* end) const override {
+        return buf;
+    }
+    bool Deserialize(const uint8_t** buf_ptr, const uint8_t* end) override {
+        return true;
+    }
 };
 
 struct SetBootParamsRequest : public KeymasterMessage {
-    explicit SetBootParamsRequest(int32_t ver = MAX_MESSAGE_VERSION) : KeymasterMessage(ver) {}
+    explicit SetBootParamsRequest(int32_t ver = MAX_MESSAGE_VERSION)
+            : KeymasterMessage(ver) {}
 
     size_t SerializedSize() const override {
-        return (sizeof(os_version) + sizeof(os_patchlevel) + sizeof(device_locked) +
-                sizeof(verified_boot_state) + verified_boot_key.SerializedSize() +
+        return (sizeof(os_version) + sizeof(os_patchlevel) +
+                sizeof(device_locked) + sizeof(verified_boot_state) +
+                verified_boot_key.SerializedSize() +
                 verified_boot_hash.SerializedSize());
     }
     uint8_t* Serialize(uint8_t* buf, const uint8_t* end) const override {
@@ -111,15 +131,19 @@ struct SetBootParamsRequest : public KeymasterMessage {
 struct SetBootParamsResponse : public NoResponse {};
 
 struct SetAttestationKeyRequest : public KeymasterMessage {
-    explicit SetAttestationKeyRequest(int32_t ver = MAX_MESSAGE_VERSION) : KeymasterMessage(ver) {}
+    explicit SetAttestationKeyRequest(int32_t ver = MAX_MESSAGE_VERSION)
+            : KeymasterMessage(ver) {}
 
-    size_t SerializedSize() const override { return sizeof(uint32_t) + key_data.SerializedSize(); }
+    size_t SerializedSize() const override {
+        return sizeof(uint32_t) + key_data.SerializedSize();
+    }
     uint8_t* Serialize(uint8_t* buf, const uint8_t* end) const override {
         buf = append_uint32_to_buf(buf, end, algorithm);
         return key_data.Serialize(buf, end);
     }
     bool Deserialize(const uint8_t** buf_ptr, const uint8_t* end) override {
-        return copy_uint32_from_buf(buf_ptr, end, &algorithm) && key_data.Deserialize(buf_ptr, end);
+        return copy_uint32_from_buf(buf_ptr, end, &algorithm) &&
+               key_data.Deserialize(buf_ptr, end);
     }
 
     keymaster_algorithm_t algorithm;
@@ -129,10 +153,13 @@ struct SetAttestationKeyRequest : public KeymasterMessage {
 struct SetAttestationKeyResponse : public NoResponse {};
 
 struct AppendAttestationCertChainRequest : public KeymasterMessage {
-    explicit AppendAttestationCertChainRequest(int32_t ver = MAX_MESSAGE_VERSION)
-        : KeymasterMessage(ver) {}
+    explicit AppendAttestationCertChainRequest(
+            int32_t ver = MAX_MESSAGE_VERSION)
+            : KeymasterMessage(ver) {}
 
-    size_t SerializedSize() const override { return sizeof(uint32_t) + cert_data.SerializedSize(); }
+    size_t SerializedSize() const override {
+        return sizeof(uint32_t) + cert_data.SerializedSize();
+    }
     uint8_t* Serialize(uint8_t* buf, const uint8_t* end) const override {
         buf = append_uint32_to_buf(buf, end, algorithm);
         return cert_data.Serialize(buf, end);
@@ -149,16 +176,17 @@ struct AppendAttestationCertChainRequest : public KeymasterMessage {
 struct AppendAttestationCertChainResponse : public NoResponse {};
 
 /**
- * For Android Things Attestation Provisioning (ATAP), the GetCaRequest message in the protocol are
- * raw opaque messages for the purposes of this IPC call. Since the SetCaResponse message will be
- * very large (> 10k), SetCaResponse is split into *Begin, *Update, and *Finish operations.
+ * For Android Things Attestation Provisioning (ATAP), the GetCaRequest message
+ * in the protocol are raw opaque messages for the purposes of this IPC call.
+ * Since the SetCaResponse message will be very large (> 10k), SetCaResponse is
+ * split into *Begin, *Update, and *Finish operations.
  */
 struct AtapGetCaRequestRequest : public RawBufferRequest {};
 struct AtapGetCaRequestResponse : public RawBufferResponse {};
 
 struct AtapSetCaResponseBeginRequest : public KeymasterMessage {
     explicit AtapSetCaResponseBeginRequest(int32_t ver = MAX_MESSAGE_VERSION)
-        : KeymasterMessage(ver) {}
+            : KeymasterMessage(ver) {}
 
     size_t SerializedSize() const override { return sizeof(uint32_t); }
     uint8_t* Serialize(uint8_t* buf, const uint8_t* end) const override {

@@ -60,7 +60,8 @@ void TrustyAtapOps::set_product_id(uint8_t product_id[ATAP_PRODUCT_ID_LEN]) {
     memcpy(product_id_, product_id, ATAP_PRODUCT_ID_LEN);
 }
 
-AtapResult TrustyAtapOps::read_product_id(uint8_t product_id[ATAP_PRODUCT_ID_LEN]) {
+AtapResult TrustyAtapOps::read_product_id(
+        uint8_t product_id[ATAP_PRODUCT_ID_LEN]) {
     memcpy(product_id, product_id_, ATAP_PRODUCT_ID_LEN);
     return ATAP_RESULT_OK;
 }
@@ -74,14 +75,17 @@ AtapResult TrustyAtapOps::read_auth_key_cert_chain(AtapCertChain* cert_chain) {
     return ATAP_RESULT_ERROR_UNSUPPORTED_OPERATION;
 }
 
-AtapResult TrustyAtapOps::write_attestation_key(AtapKeyType key_type, const AtapBlob* key,
-                                                const AtapCertChain* cert_chain) {
+AtapResult TrustyAtapOps::write_attestation_key(
+        AtapKeyType key_type,
+        const AtapBlob* key,
+        const AtapCertChain* cert_chain) {
     AttestationKeySlot slot = MapKeyTypeToSlot(key_type);
     if (slot == AttestationKeySlot::kInvalid) {
         LOG_E("Invalid key type: %d", key_type);
         return ATAP_RESULT_ERROR_INVALID_INPUT;
     }
-    keymaster_error_t result = WriteKeyToStorage(slot, key->data, key->data_length);
+    keymaster_error_t result =
+            WriteKeyToStorage(slot, key->data, key->data_length);
     if (result != KM_ERROR_OK) {
         LOG_E("Failed to write key to slot %d (err = %d)", slot, result);
         return ATAP_RESULT_ERROR_STORAGE;
@@ -90,32 +94,38 @@ AtapResult TrustyAtapOps::write_attestation_key(AtapKeyType key_type, const Atap
         result = WriteCertToStorage(slot, cert_chain->entries[i].data,
                                     cert_chain->entries[i].data_length, i);
         if (result != KM_ERROR_OK) {
-            LOG_E("Failed to write cert %d to slot %d (err = %d)", i, slot, result);
+            LOG_E("Failed to write cert %d to slot %d (err = %d)", i, slot,
+                  result);
             return ATAP_RESULT_ERROR_STORAGE;
         }
     }
     return ATAP_RESULT_OK;
 }
 
-AtapResult TrustyAtapOps::read_attestation_public_key(AtapKeyType key_type,
-                                                      uint8_t pubkey[ATAP_KEY_LEN_MAX],
-                                                      uint32_t* pubkey_len) {
+AtapResult TrustyAtapOps::read_attestation_public_key(
+        AtapKeyType key_type,
+        uint8_t pubkey[ATAP_KEY_LEN_MAX],
+        uint32_t* pubkey_len) {
     return ATAP_RESULT_ERROR_UNSUPPORTED_OPERATION;
 }
 
-AtapResult TrustyAtapOps::read_soc_global_key(uint8_t global_key[ATAP_AES_128_KEY_LEN]) {
+AtapResult TrustyAtapOps::read_soc_global_key(
+        uint8_t global_key[ATAP_AES_128_KEY_LEN]) {
     return ATAP_RESULT_ERROR_UNSUPPORTED_OPERATION;
 }
 
-AtapResult TrustyAtapOps::write_hex_uuid(const uint8_t uuid[ATAP_HEX_UUID_LEN]) {
+AtapResult TrustyAtapOps::write_hex_uuid(
+        const uint8_t uuid[ATAP_HEX_UUID_LEN]) {
     if (KM_ERROR_OK != WriteAttestationUuid(uuid)) {
         return ATAP_RESULT_ERROR_STORAGE;
     }
     return ATAP_RESULT_OK;
 }
 
-AtapResult TrustyAtapOps::auth_key_sign(const uint8_t* nonce, uint32_t nonce_len,
-                                        uint8_t sig[ATAP_SIGNATURE_LEN_MAX], uint32_t* sig_len) {
+AtapResult TrustyAtapOps::auth_key_sign(const uint8_t* nonce,
+                                        uint32_t nonce_len,
+                                        uint8_t sig[ATAP_SIGNATURE_LEN_MAX],
+                                        uint32_t* sig_len) {
     return ATAP_RESULT_ERROR_UNSUPPORTED_OPERATION;
 }
 

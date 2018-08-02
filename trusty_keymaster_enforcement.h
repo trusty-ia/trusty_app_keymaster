@@ -27,9 +27,10 @@ const int kAccessMapTableSize = 32;
 const int kAccessCountTableSize = 32;
 
 class TrustyKeymasterEnforcement : public KeymasterEnforcement {
-  public:
+public:
     TrustyKeymasterEnforcement(TrustyKeymasterContext* context)
-        : KeymasterEnforcement(kAccessMapTableSize, kAccessCountTableSize), context_(context) {}
+            : KeymasterEnforcement(kAccessMapTableSize, kAccessCountTableSize),
+              context_(context) {}
     ~TrustyKeymasterEnforcement() {}
 
     bool activation_date_valid(uint64_t activation_date) const override {
@@ -42,11 +43,12 @@ class TrustyKeymasterEnforcement : public KeymasterEnforcement {
         return false;
     }
 
-    bool auth_token_timed_out(const hw_auth_token_t& token, uint32_t timeout) const override;
+    bool auth_token_timed_out(const hw_auth_token_t& token,
+                              uint32_t timeout) const override;
     uint32_t get_current_time() const override;
     bool ValidateTokenSignature(const hw_auth_token_t& token) const override;
 
-  private:
+private:
     uint64_t milliseconds_since_boot() const;
 
     TrustyKeymasterContext* context_;
