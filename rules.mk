@@ -80,8 +80,8 @@ MODULE_COMPILEFLAGS := -U__ANDROID__ -D__TRUSTY__
 
 MODULE_DEPS += \
 	app/trusty \
-	lib/libc-trusty \
-	lib/libstdc++-trusty \
+	trusty/user/base/lib/libc-trusty \
+	trusty/user/base/lib/libstdc++-trusty \
 	trusty/user/base/lib/rng \
 	trusty/user/base/lib/hwkey \
 	trusty/user/base/lib/storage \
