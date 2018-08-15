@@ -82,9 +82,9 @@ MODULE_DEPS += \
 	app/trusty \
 	lib/libc-trusty \
 	lib/libstdc++-trusty \
-	lib/rng \
-	lib/hwkey \
-	lib/storage \
+	trusty/user/base/lib/rng \
+	trusty/user/base/lib/hwkey \
+	trusty/user/base/lib/storage \
 	external/boringssl \
 
 include $(LOCAL_DIR)/atap/rules.mk

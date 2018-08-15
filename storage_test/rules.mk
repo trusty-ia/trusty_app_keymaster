@@ -29,7 +29,7 @@ MODULE_DEPS += \
     app/trusty \
     lib/libc-trusty \
     lib/libstdc++-trusty \
-    lib/rng \
-    lib/storage \
+    trusty/user/base/lib/rng \
+    trusty/user/base/lib/storage \
 
 include make/module.mk
