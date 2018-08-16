@@ -26,7 +26,6 @@ MODULE_SRCS += \
     $(KEYMASTER_ROOT)/logger.cpp
 
 MODULE_DEPS += \
-    app/trusty \
     trusty/user/base/lib/libc-trusty \
     trusty/user/base/lib/libstdc++-trusty \
     trusty/user/base/lib/rng \

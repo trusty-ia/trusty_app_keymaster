@@ -79,7 +79,6 @@ MODULE_COMPILEFLAGS := -U__ANDROID__ -D__TRUSTY__
 #MODULE_COMPILEFLAGS += -DKEYMASTER_DEBUG
 
 MODULE_DEPS += \
-	app/trusty \
 	trusty/user/base/lib/libc-trusty \
 	trusty/user/base/lib/libstdc++-trusty \
 	trusty/user/base/lib/rng \
