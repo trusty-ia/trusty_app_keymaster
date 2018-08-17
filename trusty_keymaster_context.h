@@ -51,11 +51,12 @@ public:
     void GetSystemVersion(uint32_t* os_version,
                           uint32_t* os_patchlevel) const override;
 
-    KeyFactory* GetKeyFactory(keymaster_algorithm_t algorithm) const override;
-    OperationFactory* GetOperationFactory(
+    const KeyFactory* GetKeyFactory(
+            keymaster_algorithm_t algorithm) const override;
+    const OperationFactory* GetOperationFactory(
             keymaster_algorithm_t algorithm,
             keymaster_purpose_t purpose) const override;
-    keymaster_algorithm_t* GetSupportedAlgorithms(
+    const keymaster_algorithm_t* GetSupportedAlgorithms(
             size_t* algorithms_count) const override;
 
     keymaster_error_t GetVerifiedBootParams(
