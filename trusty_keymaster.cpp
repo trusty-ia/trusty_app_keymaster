@@ -20,15 +20,14 @@
 
 #ifndef DISABLE_ATAP_SUPPORT
 #include <libatap/libatap.h>
+// This assumes EC cert chains do not exceed 1k and other cert chains do not
+// exceed 5k.
+const size_t kMaxCaResponseSize = 20000;
 #endif
 
 #include "secure_storage.h"
 
 namespace keymaster {
-
-// This assumes EC cert chains do not exceed 1k and other cert chains do not
-// exceed 5k.
-const size_t kMaxCaResponseSize = 20000;
 
 long TrustyKeymaster::GetAuthTokenKey(keymaster_key_blob_t* key) {
     keymaster_error_t error = context_->GetAuthTokenKey(key);
