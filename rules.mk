@@ -35,7 +35,8 @@ MODULE_SRCS += \
 	$(KEYMASTER_ROOT)/km_openssl/ec_key_factory.cpp \
 	$(KEYMASTER_ROOT)/km_openssl/ecdsa_operation.cpp \
 	$(KEYMASTER_ROOT)/km_openssl/hmac_key.cpp \
-	$(LOCAL_DIR)/override/hmac_operation.cpp \
+	$(KEYMASTER_ROOT)/km_openssl/attestation_utils.cpp \
+	$(KEYMASTER_ROOT)/km_openssl/hmac_operation.cpp \
 	$(KEYMASTER_ROOT)/android_keymaster/keymaster_enforcement.cpp \
 	$(KEYMASTER_ROOT)/android_keymaster/logger.cpp \
 	$(KEYMASTER_ROOT)/key_blob_utils/ocb.c \

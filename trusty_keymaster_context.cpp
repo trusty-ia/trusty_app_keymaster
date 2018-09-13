@@ -522,60 +522,29 @@ TrustyKeymasterContext::GetVerifiedBootParams(keymaster_blob_t* verified_boot_ke
     return KM_ERROR_OK;
 }
 
-const keymaster_key_blob_t* TrustyKeymasterContext::getAttestationKey(keymaster_algorithm_t algorithm,
-                                                 keymaster_error_t* error) const{
+KeymasterKeyBlob getAttestationKey(keymaster_algorithm_t algorithm,
+                                            keymaster_error_t* error) {
 
     uint8_t* key = nullptr;
     uint32_t key_size = 0;
-    UniquePtr<uint8_t[]> key_deleter;
-
-#if 0
-    int evp_key_type;
-    switch (algorithm) {
-    case KM_ALGORITHM_RSA:
-        evp_key_type = EVP_PKEY_RSA;
-        break;
-
-    case KM_ALGORITHM_EC:
-        evp_key_type = EVP_PKEY_EC;
-        break;
-
-    default:
-        *error = KM_ERROR_UNSUPPORTED_ALGORITHM;
-        return nullptr;
-    }
-#endif
 
     *error = ReadKeyFromStorage(algorithm, &key, &key_size);
-    if (*error == KM_ERROR_OK) {
-        key_deleter.reset(key);
-    } else {
+    if (*error != KM_ERROR_OK) {
         LOG_E("Failed to read attestation key from RPMB, falling back to test key", 0);
         *error = GetSoftwareAttestationKey(algorithm, &key, &key_size);
+        if (*error != KM_ERROR_OK)
+            return {};
     }
-
-    if (*error != KM_ERROR_OK)
-        return nullptr;
-#if 0
-    const uint8_t* const_key = key;
-
-    EVP_PKEY* pkey = d2i_PrivateKey(evp_key_type, nullptr, &const_key, key_size);
-    if (!pkey)
-        *error = TranslateLastOpenSslError();
-
-    return pkey;
-#endif
-    static const keymaster_key_blob_t AttestKeyBlob = {
-        (const uint8_t*)key, key_size
-    };
-
-    return &AttestKeyBlob;
+    auto result = KeymasterKeyBlob(key, key_size);
+    if (!result.key_material)
+        *error = KM_ERROR_MEMORY_ALLOCATION_FAILED;
+    return result;
 }
 
-keymaster_cert_chain_t* TrustyKeymasterContext::getAttestationChain(keymaster_algorithm_t algorithm,
-                                                                 keymaster_error_t* error)  const{
+CertChainPtr getAttestationChain(keymaster_algorithm_t algorithm,
+                                                     keymaster_error_t* error) {
 
-    UniquePtr<keymaster_cert_chain_t, CertificateChainDelete> chain(new keymaster_cert_chain_t);
+    CertChainPtr chain(new keymaster_cert_chain_t);
     if (!chain.get()) {
         *error = KM_ERROR_MEMORY_ALLOCATION_FAILED;
         return nullptr;
@@ -594,9 +563,9 @@ keymaster_cert_chain_t* TrustyKeymasterContext::getAttestationChain(keymaster_al
 
     if (*error != KM_ERROR_OK)
         return nullptr;
-    return chain.release();
+    return chain;
 }
-#if 0
+
 keymaster_error_t TrustyKeymasterContext::GenerateAttestation(const Key& key,
         const AuthorizationSet& attest_params, CertChainPtr* cert_chain) const {
 
@@ -620,9 +589,10 @@ keymaster_error_t TrustyKeymasterContext::GenerateAttestation(const Key& key,
     if (error != KM_ERROR_OK) return error;
 
     return generate_attestation(asymmetric_key, attest_params,
-            *attestation_chain, *attestation_key, *this, cert_chain);
+                                *attestation_chain, attestation_key, *this,
+                                cert_chain);
 }
-#endif
+
 keymaster_error_t TrustyKeymasterContext::SetBootParams(
     uint32_t os_version, uint32_t os_patchlevel, const Buffer& verified_boot_key,
     keymaster_verified_boot_t verified_boot_state, bool device_locked) {
