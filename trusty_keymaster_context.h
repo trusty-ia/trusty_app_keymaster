@@ -86,9 +86,7 @@ class TrustyKeymasterContext : public KeymasterContext,
 
     keymaster_error_t GenerateAttestation(const Key& key,
                             const AuthorizationSet& attest_params,
-                            CertChainPtr* cert_chain) const override {
-        return KM_ERROR_UNIMPLEMENTED;
-    }
+                            CertChainPtr* cert_chain) const override;
 
     keymaster_error_t GenerateUniqueId(uint64_t creation_date_time,
                                        const keymaster_blob_t& application_id,
@@ -144,11 +142,6 @@ class TrustyKeymasterContext : public KeymasterContext,
 
     keymaster_error_t ParseKeyboxToStorage(keymaster_algorithm_t algorithm,
                                         XMLElement* xml_root);
-
-    keymaster_cert_chain_t* getAttestationChain(keymaster_algorithm_t algorithm,
-                                        keymaster_error_t* error) const;
-    const keymaster_key_blob_t* getAttestationKey(keymaster_algorithm_t algorithm,
-                                        keymaster_error_t* error) const;
 
     TrustyKeymasterEnforcement enforcement_policy_;
 
