@@ -573,10 +573,9 @@ KeymasterKeyBlob AttestationKey(keymaster_algorithm_t algorithm,
     return result;
 }
 
-keymaster_cert_chain_t* AttestationChain(keymaster_algorithm_t algorithm,
+CertChainPtr AttestationChain(keymaster_algorithm_t algorithm,
                                          keymaster_error_t* error) {
-    UniquePtr<keymaster_cert_chain_t, CertificateChainDelete> chain(
-            new keymaster_cert_chain_t);
+    CertChainPtr chain(new keymaster_cert_chain_t);
     if (!chain.get()) {
         *error = KM_ERROR_MEMORY_ALLOCATION_FAILED;
         return nullptr;
@@ -603,7 +602,7 @@ keymaster_cert_chain_t* AttestationChain(keymaster_algorithm_t algorithm,
     }
     if (*error != KM_ERROR_OK)
         return nullptr;
-    return chain.release();
+    return chain;
 }
 
 keymaster_error_t TrustyKeymasterContext::GenerateAttestation(
