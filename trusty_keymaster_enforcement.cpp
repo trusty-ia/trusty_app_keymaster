@@ -23,7 +23,7 @@
 #include <keymaster/km_openssl/openssl_err.h>
 
 #include "trusty_keymaster_context.h"
-
+#include <trusty_std.h>
 namespace keymaster {
 
 keymaster_security_level_t TrustyKeymasterEnforcement::SecurityLevel() const {

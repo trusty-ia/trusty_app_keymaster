@@ -291,7 +291,7 @@ keymaster_error_t ReadCertChainFromStorage(AttestationKeySlot key_slot,
            sizeof(cert_chain->entries[0]) * cert_chain_length);
 
     // Read |cert_chain_length| certs from storage
-    for (size_t i = 0; i < cert_chain_length; i++) {
+    for (uint32_t i = 0; i < cert_chain_length; i++) {
         snprintf(cert_file.get(), kStorageIdLengthMax, "%s.%s.%d",
                  kAttestCertPrefix, GetKeySlotStr(key_slot), i);
         if (!SecureStorageGetFileSize(cert_file.get(), &cert_size) ||
@@ -401,7 +401,7 @@ keymaster_error_t DeleteCertChain(AttestationKeySlot key_slot) {
     if (ReadCertChainLength(key_slot, &cert_chain_length) != KM_ERROR_OK) {
         return KM_ERROR_UNKNOWN_ERROR;
     }
-    for (size_t i = 0; i < cert_chain_length; ++i) {
+    for (uint32_t i = 0; i < cert_chain_length; ++i) {
         snprintf(cert_file.get(), kStorageIdLengthMax, "%s.%s.%d",
                  kAttestCertPrefix, GetKeySlotStr(key_slot), i);
         if (!SecureStorageDeleteFile(cert_file.get())) {
