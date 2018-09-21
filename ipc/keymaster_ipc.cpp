@@ -505,6 +505,11 @@ static long keymaster_dispatch_non_secure(keymaster_chan_ctx* ctx,
         return do_dispatch(&TrustyKeymaster::SetBootParams, msg, payload_size,
                            out, out_size);
 
+    case KM_PROVISION_KEYBOX:
+        LOG_D("Dispatching KM_PROVISION_KEYBOX, size %d", payload_size);
+        return do_dispatch(&TrustyKeymaster::ProvisionAttesationKeybox, msg, payload_size,
+                           out, out_size);
+
     case KM_SET_ATTESTATION_KEY:
         LOG_D("Dispatching SET_ATTESTION_KEY, size %d", payload_size);
         return do_dispatch(&TrustyKeymaster::SetAttestationKey, msg,
