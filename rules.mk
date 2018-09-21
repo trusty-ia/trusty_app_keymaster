@@ -88,5 +88,6 @@ MODULE_DEPS += \
 
 include $(LOCAL_DIR)/atap/rules.mk
 include $(LOCAL_DIR)/ipc/rules.mk
+include $(LOCAL_DIR)/provision/rules.mk
 
 include make/module.mk

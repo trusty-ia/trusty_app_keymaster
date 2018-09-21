@@ -21,6 +21,7 @@
 
 #include "trusty_keymaster_context.h"
 #include "trusty_keymaster_messages.h"
+#include "provision/provision_keybox.h"
 #ifndef DISABLE_ATAP_SUPPORT
 #include "atap/trusty_atap_ops.h"
 #include "ops/atap_ops_provider.h"
@@ -32,7 +33,8 @@ namespace keymaster {
 // implemented by AndroidKeymaster but some operations which are not part of the
 // interface with Android are implemented here. These operations are expected to
 // be called from a bootloader or another Trusty application.
-class TrustyKeymaster : public AndroidKeymaster {
+class TrustyKeymaster : public AndroidKeymaster,
+    public ProvisionKeyboxOperation {
 public:
     TrustyKeymaster(TrustyKeymasterContext* context,
                     size_t operation_table_size)
