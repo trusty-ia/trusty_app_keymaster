@@ -17,8 +17,7 @@ LOCAL_DIR := $(GET_LOCAL_DIR)
 
 MODULE := $(LOCAL_DIR)
 
-ANDROID_ROOT := $(LOCAL_DIR)/../../..
-KEYMASTER_ROOT := $(ANDROID_ROOT)/system/keymaster
+KEYMASTER_ROOT := $(TRUSTY_TOP)/system/keymaster
 
 MODULE_SRCS += \
 	$(KEYMASTER_ROOT)/android_keymaster/android_keymaster.cpp \
@@ -66,7 +65,7 @@ MODULE_SRCS += \
 MODULE_INCLUDES := \
 	$(KEYMASTER_ROOT)/include \
 	$(KEYMASTER_ROOT) \
-	$(ANDROID_ROOT)/hardware/libhardware/include \
+	$(TRUSTY_TOP)/hardware/libhardware/include \
 	$(LOCAL_DIR)
 
 MODULE_CPPFLAGS := -std=c++14 -fno-short-enums
@@ -78,20 +77,16 @@ MODULE_COMPILEFLAGS := -U__ANDROID__ -D__TRUSTY__
 # trust from bootloader.
 #
 #MODULE_COMPILEFLAGS += -DKEYMASTER_DEBUG
-MODULE_COMPILEFLAGS += -DDISABLE_ATAP_SUPPORT
 
 MODULE_DEPS += \
-	app/trusty \
-	lib/libc-trusty \
-	lib/libstdc++-trusty \
-	lib/rng \
-	lib/storage \
-	lib/hwkey \
-	lib/tinyxml2 \
-	lib/lzma \
-	lib/trusty_syscall_x86
+	trusty/user/base/lib/libc-trusty \
+	trusty/user/base/lib/libstdc++-trusty \
+	trusty/user/base/lib/rng \
+	trusty/user/base/lib/hwkey \
+	trusty/user/base/lib/storage \
+	external/boringssl \
 
-#include $(LOCAL_DIR)/atap/rules.mk
+include $(LOCAL_DIR)/atap/rules.mk
 include $(LOCAL_DIR)/ipc/rules.mk
 include $(LOCAL_DIR)/provision/rules.mk
 
