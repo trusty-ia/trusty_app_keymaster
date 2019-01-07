@@ -89,7 +89,8 @@ MODULE_DEPS += \
 	lib/hwkey \
 	lib/tinyxml2 \
 	lib/lzma \
-	lib/trusty_syscall_x86
+	lib/trusty_syscall_x86 \
+	lib/hwkey_crypt
 
 #include $(LOCAL_DIR)/atap/rules.mk
 include $(LOCAL_DIR)/ipc/rules.mk

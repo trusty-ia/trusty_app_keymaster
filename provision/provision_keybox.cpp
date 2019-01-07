@@ -24,6 +24,10 @@
 #include "secure_storage.h"
 #include "trusty_logger.h"
 #include <openssl/base64.h>
+#include "lib/storage/storage.h"
+#include "interface/hwkey/hwkey.h"
+#include "lib/hwkey/hwkey.h"
+#include "trusty_key_crypt.h"
 #include "trusty_device_info.h"
 #include "trusty_syscalls_x86.h"
 #include "trusty_keymaster_context.h"
@@ -44,15 +48,6 @@ namespace keymaster {
 static void *AllocForLzma(void *p, size_t size) { UNUSED_VAR(p); return malloc(size); }
 static void FreeForLzma(void *p, void *address) { UNUSED_VAR(p); free(address); }
 static ISzAlloc g_AllocForLzma = { &AllocForLzma, &FreeForLzma };
-
-
-typedef struct attk_keybox_header {
-   uint16_t version;     // version 1 supports plan and LZMA
-   uint16_t size;        // decompressed size excluding this header
-   uint8_t  format;      // indicates file format, 0 = plain, 1 = LZMA
-   uint8_t  reserved[3]; // not used
-} attkb_header_t;
-
 
 static XMLElement *tinyxml2_WalkNextElement(XMLElement *root, XMLElement *element)
 {
@@ -153,54 +148,186 @@ static uint8_t *decompress_attkb(uint8_t* keybox, size_t compressed_size) {
     return decompressed_attkb;
 }
 
+#ifdef RETRIEVE_ATTKB_FROM_RAW_RPMB
+/* Keybox is read from RPMB (bypass fs). */
+static keymaster_error_t get_keybox_from_raw_rpmb(uint8_t** keybox, uint32_t* keybox_size) {
+    storage_session_t session;
+    size_t encrypt_attkb_size;
+    ssize_t res;
+    void *kb_data;
 
-/* the keybox will be retrieved from the CSE side */
-keymaster_error_t RetrieveKeybox(uint8_t** keybox, uint32_t* keybox_size) {
+    int rc = storage_open_session(&session, STORAGE_CLIENT_TP_PORT);
+    if (rc < 0) {
+        LOG_E("Error: [%d] opening storage session [%s]\n",
+                rc, STORAGE_CLIENT_TP_PORT);
+        return KM_ERROR_UNKNOWN_ERROR;
+    }
+
+    res = storage_get_attkb_size(session, &encrypt_attkb_size);
+    if (res < 0 || !encrypt_attkb_size) {
+        LOG_E("Failed to get attkb size\n", 0);
+        storage_close_session(session);
+        return KM_ERROR_UNKNOWN_ERROR;
+    }
+
+    kb_data = malloc(encrypt_attkb_size);
+    if (!kb_data) {
+        LOG_E("Failed to alloc buf for keybox:%d.\n", encrypt_attkb_size);
+        storage_close_session(session);
+        return KM_ERROR_MEMORY_ALLOCATION_FAILED;
+    }
+    memset(kb_data, 0, encrypt_attkb_size);
+
+    res = storage_read_attkb(session, kb_data, encrypt_attkb_size);
+    if ((size_t)res != encrypt_attkb_size) {
+        LOG_E("Failed to read keybox from SS, res = %d\n", res);
+        free(kb_data);
+        storage_close_session(session);
+        return KM_ERROR_UNKNOWN_ERROR;
+    }
+
+    storage_close_session(session);
+
+    *keybox_size = encrypt_attkb_size;
+    *keybox = (uint8_t *)kb_data;
+
+    return KM_ERROR_OK;
+}
+
+#else
+/* Keybox is retrieved from the CSE directly. */
+static keymaster_error_t get_keybox_from_cse(trusty_device_info_t * dev_info, uint8_t** keybox, uint32_t* keybox_size) {
+    *keybox_size = dev_info->attkb_size;
+    if (*keybox_size == 0) {
+        LOG_E("Failed to get keybox from CSE.\n", 0);
+        return KM_ERROR_UNKNOWN_ERROR;
+    }
+
+    *keybox = (uint8_t *)malloc(*keybox_size);
+    if (*keybox == NULL) {
+        return KM_ERROR_UNKNOWN_ERROR;
+    }
+
+    memcpy_s(*keybox, *keybox_size, dev_info->attkb, *keybox_size);
+
+    return KM_ERROR_OK;
+}
+#endif
+
+static keymaster_error_t decrypt_attkb(trusty_encrypted_attkb_t *attkb, uint8_t *attkb_enc_key,
+                                   uint8_t* keybox, uint32_t* keybox_size, size_t *out_size) {
     int rc = -1;
+    trusty_encrypted_attkb_t aad;
+
+    /* AAD for GCM is struct trusty_encrypted_attkb_t with tag cleared */
+    memcpy_s(&aad, sizeof(trusty_encrypted_attkb_t), attkb, sizeof(trusty_encrypted_attkb_t));
+    secure_memzero(aad.trusty_cipher_blob.tag, sizeof(attkb->trusty_cipher_blob.tag));
+
+    size_t cipher_len = attkb->trusty_cipher_blob.cipher_blob_size + sizeof(attkb->trusty_cipher_blob.tag);
+    void *cipher = (void *)malloc(cipher_len);
+    if (cipher == NULL) {
+        return KM_ERROR_MEMORY_ALLOCATION_FAILED;
+    }
+
+    /* exchange cipher and tag sequence to match aes_256_gcm_decrypt API */
+    memcpy_s(cipher, attkb->trusty_cipher_blob.cipher_blob_size,
+             attkb->trusty_cipher_blob.cipher_blob, attkb->trusty_cipher_blob.cipher_blob_size);
+    memcpy_s((uint8_t*)cipher + attkb->trusty_cipher_blob.cipher_blob_size, sizeof(attkb->trusty_cipher_blob.tag),
+             attkb->trusty_cipher_blob.tag, sizeof(attkb->trusty_cipher_blob.tag));
+
+    rc = aes_256_gcm_decrypt((const struct gcm_key *)attkb_enc_key,
+                             (const void *)attkb->trusty_cipher_blob.iv,
+                             sizeof(attkb->trusty_cipher_blob.iv),
+                             (const void *)&aad,
+                             sizeof(trusty_encrypted_attkb_t),
+                             (const void *)cipher,
+                             cipher_len,
+                             keybox + sizeof(attkb_header_t), out_size);
+    secure_memzero(cipher, sizeof(cipher_len));
+    free(cipher);
+    if (rc) {
+        secure_memzero(keybox, *keybox_size);
+        free(keybox);
+        *keybox_size = 0;
+        LOG_E("fail to decrypt attkb: %d.\n",rc);
+        return KM_ERROR_IMPORTED_KEY_DECRYPTION_FAILED;
+    }
+
+    *keybox_size = (uint32_t)(*out_size);
+    *(char*)(keybox + sizeof(attkb_header_t) + *keybox_size) = '\0';
+
+    return KM_ERROR_OK;
+}
+
+keymaster_error_t RetrieveKeybox(uint8_t** keybox, uint32_t* keybox_size) {
     keymaster_error_t ret = KM_ERROR_OK;
     trusty_device_info_t *dev_info = NULL;
     uint32_t buffer_size = sizeof(trusty_device_info_t) + MAX_ATTKB_SIZE;
-    attkb_header_t *attkb_hdr = NULL;
-    size_t attkb_hdr_size = 0;
+    trusty_encrypted_attkb_t *attkb = NULL;
+    size_t out_size = 0;
 
-    if((keybox_size == NULL) || (keybox == NULL))
+    if ((keybox_size == NULL) || (keybox == NULL))
         return KM_ERROR_UNEXPECTED_NULL_POINTER;
 
     dev_info = (trusty_device_info_t *)malloc(buffer_size);
-    if(!dev_info)
+    if (!dev_info)
         return KM_ERROR_MEMORY_ALLOCATION_FAILED;
+
     memset(dev_info, 0, buffer_size);
-    rc = get_device_info(dev_info);
-    if(rc != 0) {
+    if (0 != get_device_info(dev_info)) {
         LOG_E("RetrieveKeybox failed!", 0);
         ret = KM_ERROR_UNKNOWN_ERROR;
         goto clear_sensitive_data;
     }
 
-    *keybox_size = dev_info->attkb_size;
-    *keybox = (uint8_t *)malloc(dev_info->attkb_size);
-    if(*keybox == NULL) {
-        ret = KM_ERROR_UNKNOWN_ERROR;
+#ifdef RETRIEVE_ATTKB_FROM_RAW_RPMB
+    ret = get_keybox_from_raw_rpmb(keybox, keybox_size);
+    if (ret) {
+        LOG_E("Get keybox from rpmb failed!", 0);
         goto clear_sensitive_data;
     }
-    memcpy_s(*keybox, *keybox_size, dev_info->attkb, *keybox_size);
+#else
+    ret = get_keybox_from_cse(dev_info, keybox, keybox_size);
+    if (ret) {
+        LOG_E("Get keybox from cse failed!", 0);
+        goto clear_sensitive_data;
+    }
+#endif
 
-    attkb_hdr = (attkb_header_t *)(*keybox);
-    /* indicates file format, 0 = plain, 1 = LZMA */
-    if((attkb_hdr->version == 1) && (attkb_hdr->format == 1)) {
-        uint8_t* decompressed_attkb = NULL;
-        attkb_hdr_size = sizeof(attkb_header_t);
-        decompressed_attkb = decompress_attkb(*keybox + attkb_hdr_size, attkb_hdr->size);
-        free(*keybox);
-        *keybox = decompressed_attkb;
-        if(decompressed_attkb == NULL) {
-            ret = KM_ERROR_UNKNOWN_ERROR;
+    attkb = (trusty_encrypted_attkb_t *)(*keybox);
+    out_size = attkb->attkb_header.size;
+
+    /* adapt for MCA_BOOTLOADER_READ_ATTKB_EX request which is always response encrypted. */
+    if (attkb->attkb_header.format.encrypted == 1) {
+        ret = decrypt_attkb(attkb, dev_info->sec_info.attkb_enc_key, *keybox, keybox_size, &out_size);
+        if (ret) {
+            LOG_E("decrypt_attkb fail!", 0);
             goto clear_sensitive_data;
         }
     }
 
+    /* decompress to get the keybox if the attkb has been compressed */
+    if ((attkb->attkb_header.version == ATT_KEYBOX_VERSION) &&
+        (attkb->attkb_header.format.compressed == ATT_KEYBOX_FORMAT_LZMA)) {
+        uint8_t* decompressed_attkb = NULL;
+        decompressed_attkb = decompress_attkb(*keybox + sizeof(attkb_header_t), out_size);
+        secure_memzero(*keybox, *keybox_size);
+        free(*keybox);
+
+        if(decompressed_attkb == NULL) {
+            LOG_E("RetrieveKeybox decompressed_attkb failed!\n", 0);
+            ret = KM_ERROR_UNKNOWN_ERROR;
+            goto clear_sensitive_data;
+        }
+        *keybox = decompressed_attkb;
+    }
+    else {
+        *keybox += sizeof(attkb_header_t);
+    }
+
 clear_sensitive_data:
-    memset(dev_info, 0, buffer_size);
+    secure_memzero(dev_info, buffer_size);
+    LOG_E("RetrieveKeybox ret is %d!\n", ret);
     free(dev_info);
     return ret;
 }
@@ -216,7 +343,8 @@ keymaster_error_t keybox_xml_initialize(const uint8_t* keybox, XMLElement** xml_
     doc->LoadXmlData((char *)keybox);
 
     if (doc->Error()) {
-        LOG_E("Parsing XML data failed!", 0);
+        LOG_E("Parsing XML data failed:%d.", doc->ErrorID());
+        delete doc;
         return KM_ERROR_UNKNOWN_ERROR;
     }
     *xml_root = doc->RootElement();
