@@ -29,8 +29,6 @@
 
 #include "trusty_keymaster.h"
 #include "trusty_logger.h"
-#include <trusty_std.h>
-#include <trusty_uuid.h>
 
 using namespace keymaster;
 
