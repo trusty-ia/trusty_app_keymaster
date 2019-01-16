@@ -171,7 +171,7 @@ keymaster_error_t RetrieveKeybox(uint8_t** keybox, uint32_t* keybox_size) {
         return KM_ERROR_MEMORY_ALLOCATION_FAILED;
     memset(dev_info, 0, buffer_size);
     rc = get_device_info(dev_info);
-    if(rc != 0) {
+    if ((rc != 0) || (dev_info->attkb_size == 0)) {
         LOG_E("RetrieveKeybox failed!", 0);
         ret = KM_ERROR_UNKNOWN_ERROR;
         goto clear_sensitive_data;
@@ -217,11 +217,13 @@ keymaster_error_t keybox_xml_initialize(const uint8_t* keybox, XMLElement** xml_
 
     if (doc->Error()) {
         LOG_E("Parsing XML data failed!", 0);
+        delete doc;
         return KM_ERROR_UNKNOWN_ERROR;
     }
     *xml_root = doc->RootElement();
     if (*xml_root == NULL) {
         LOG_E("Parsing XML data failed!", 0);
+        delete doc;
         return KM_ERROR_UNKNOWN_ERROR;
     }
 
@@ -297,10 +299,14 @@ keymaster_error_t get_prikey_from_keybox(XMLElement* xml_root,
     }
 
     decodedata = new uint8_t[count];
-    if (decodedata == NULL)
+    if (decodedata == NULL) {
+        delete [] base64data;
         return KM_ERROR_MEMORY_ALLOCATION_FAILED;
+    }
     if (!EVP_DecodeBase64(decodedata, (size_t *)&count, count, (const uint8_t *)base64data, strlen(base64data))) {
         LOG_E("Failed to do base64 decode!", 0);
+        delete [] base64data;
+        delete [] decodedata;
         return KM_ERROR_UNKNOWN_ERROR;
     }
     *key = decodedata;
@@ -417,9 +423,14 @@ keymaster_error_t get_cert_from_keybox(XMLElement* xml_root,
 
     decodedata = new uint8_t[count];
     if (decodedata == NULL)
+    {
+        delete [] base64data;
         return KM_ERROR_MEMORY_ALLOCATION_FAILED;
+    }
     if (!EVP_DecodeBase64(decodedata, (size_t *)&count, count, (const uint8_t *)base64data, strlen(base64data))) {
         LOG_E("Failed to do base64 decode!", 0);
+        delete [] base64data;
+        delete [] decodedata;
         return KM_ERROR_UNKNOWN_ERROR;
     }
     *cert = decodedata;
@@ -448,11 +459,13 @@ keymaster_error_t ParseKeyboxToStorage(
     /* provision the private key to secure storage */
     uint8_t* attest_key = NULL;
     uint32_t attest_keysize = 0;
+    UniquePtr<uint8_t[]> attest_key_deleter;
     error =  get_prikey_from_keybox(xml_root, algorithm, &attest_key, &attest_keysize);
     if (error != KM_ERROR_OK || !attest_key ||!attest_keysize) {
        LOG_E("failed(%d) to get the prikey with algo(%d)", error, algorithm);
        return KM_ERROR_UNKNOWN_ERROR;
     }
+    attest_key_deleter.reset(attest_key);
     bool exists;
     error = AttestationKeyExists(key_slot, &exists);
     if (error != KM_ERROR_OK) {
@@ -476,11 +489,13 @@ keymaster_error_t ParseKeyboxToStorage(
     for (index = 0; index<cert_chain_len; index++) {
         uint8_t* cert;
         uint32_t cert_size = 0;
+        UniquePtr<uint8_t[]> cert_deleter;
         error = get_cert_from_keybox(xml_root, algorithm, index, &cert, &cert_size);
         if (error != KM_ERROR_OK || !cert ||!cert_size) {
             LOG_E("failed(%d) to get the cert(%d) with algo(%d)", error, index, algorithm);
             return KM_ERROR_UNKNOWN_ERROR;
         }
+        cert_deleter.reset(cert);
 
         uint32_t cert_chain_length = 0;
         if (ReadCertChainLength(key_slot, &cert_chain_length) != KM_ERROR_OK) {
@@ -519,7 +534,7 @@ void ProvisionKeyboxOperation::ProvisionAttesationKeybox(
         return;
 
     uint32_t keybox_size = request.keybox_data.buffer_size();
-    const uint8_t* keybox = request.keybox_data.begin();
+    uint8_t* keybox = const_cast<uint8_t*>(request.keybox_data.begin());
 
     /* if keybox is NULL, it means need to retrieve it from the CSE by HECI */
     if (keybox == NULL) {
@@ -534,22 +549,30 @@ void ProvisionKeyboxOperation::ProvisionAttesationKeybox(
     response->error = keybox_xml_initialize(keybox, &xml_root);
     if (response->error != KM_ERROR_OK || !xml_root) {
         LOG_E("failed(%d) to initialize the keybox", response->error);
+        free(keybox);
         return;
     }
 
     response->error = ParseKeyboxToStorage(KM_ALGORITHM_RSA, xml_root);
     if(response->error != KM_ERROR_OK) {
         LOG_E("failed(%d) to parse the keybox wih KM_ALGORITHM_RSA", response->error);
-        return;
+        goto freememory;
     }
 
     response->error = ParseKeyboxToStorage(KM_ALGORITHM_EC, xml_root);
     if(response->error != KM_ERROR_OK) {
         LOG_E("failed(%d) to parse the keybox with KM_ALGORITHM_EC", response->error);
-        return;
+        goto freememory;
     }
 
     response->error = KM_ERROR_OK;
+
+freememory:
+    /* free memory */
+    XMLDocument* doc;
+    doc = xml_root->GetDocument();
+    delete doc;
+    free(keybox);
 }
 
 }  // namespace keymaster
