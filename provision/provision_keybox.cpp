@@ -45,8 +45,8 @@ namespace keymaster {
 
 #define LZMA_HEADER_SIZE    (LZMA_PROPS_SIZE + 8)
 #define UNUSED_VAR(x) (void)x;
-static void *AllocForLzma(void *p, size_t size) { UNUSED_VAR(p); return malloc(size); }
-static void FreeForLzma(void *p, void *address) { UNUSED_VAR(p); free(address); }
+static void *AllocForLzma(ISzAllocPtr p, size_t size) { UNUSED_VAR(p); return malloc(size); }
+static void FreeForLzma(ISzAllocPtr p, void *address) { UNUSED_VAR(p); free(address); }
 static ISzAlloc g_AllocForLzma = { &AllocForLzma, &FreeForLzma };
 
 static XMLElement *tinyxml2_WalkNextElement(XMLElement *root, XMLElement *element)
